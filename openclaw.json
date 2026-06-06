@@ -1,0 +1,36 @@
+{
+  "agents": {
+    "defaults": {
+      "skills": ["remitclaw"],
+      "model": "claude-sonnet-4-20250514"
+    },
+    "list": [
+      {
+        "id": "remitclaw",
+        "name": "RemitClaw",
+        "workspace": ".",
+        "skills": ["remitclaw"]
+      }
+    ]
+  },
+  "skills": {
+    "entries": {
+      "remitclaw": {
+        "enabled": true,
+        "env": {
+          "CELO_RPC_URL": "${CELO_RPC_URL}",
+          "AGENT_PRIVATE_KEY": "${AGENT_PRIVATE_KEY}"
+        }
+      }
+    },
+    "load": {
+      "extraDirs": ["./skills"],
+      "watch": true
+    }
+  },
+  "channels": {
+    "whatsapp": {
+      "enabled": false
+    }
+  }
+}

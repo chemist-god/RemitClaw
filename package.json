@@ -1,0 +1,41 @@
+{
+  "name": "remitclaw",
+  "version": "0.1.0",
+  "description": "RemitClaw — AI agent for natural-language cross-border remittances on Celo via Mento stablecoins",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli/agent.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "celo",
+    "remitclaw",
+    "remittance",
+    "mento",
+    "openclaw",
+    "stablecoin",
+    "ai-agent"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@mento-protocol/mento-sdk": "^3.0.0",
+    "dotenv": "^16.4.7",
+    "twilio": "^5.4.0",
+    "viem": "^2.23.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

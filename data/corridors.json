@@ -1,0 +1,29 @@
+[
+  {
+    "id": "usd-php",
+    "sourceCurrency": "USD",
+    "destinationCurrency": "PHP",
+    "destinationCountry": "PH",
+    "sourceToken": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+    "destinationToken": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+    "mentoPair": "USDm→PHP"
+  },
+  {
+    "id": "eur-ngn",
+    "sourceCurrency": "EUR",
+    "destinationCurrency": "NGN",
+    "destinationCountry": "NG",
+    "sourceToken": "0x10c826A163F5c566a514aFC6a0a7CA779128f0e0",
+    "destinationToken": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+    "mentoPair": "EURm→NGN"
+  },
+  {
+    "id": "gbp-kes",
+    "sourceCurrency": "GBP",
+    "destinationCurrency": "KES",
+    "destinationCountry": "KE",
+    "sourceToken": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+    "destinationToken": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+    "mentoPair": "GBP→KES"
+  }
+]
