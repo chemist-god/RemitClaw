@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <circle cx="32" cy="32" r="32" fill="#009B3A"/>
+  <circle cx="32" cy="32" r="26" fill="#FFDF00"/>
+  <circle cx="32" cy="32" r="10" fill="#002776"/>
+  <text x="32" y="36" text-anchor="middle" fill="white" font-size="8" font-family="Arial,sans-serif" font-weight="700">R$</text>
+</svg>
