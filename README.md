@@ -109,6 +109,10 @@ npm run build      # Compile TypeScript
 npm run typecheck  # Type-check without emit
 ```
 
+## Collaborators
+
+- **[Muhammad Lawan (Abu-Haneeph)](https://github.com/Abu-Haneeph)** — UI development (Next.js web app). Software developer focused on scalable blockchain applications and web solutions with React, Next.js, TypeScript, and Solidity.
+
 ## License
 
 MIT
