@@ -22,6 +22,8 @@ type ConfirmationModalProps = {
   recipientName?: string;
   confirmLabel?: string;
   doneLabel?: string;
+  busy?: boolean;
+  busyLabel?: string;
   onConfirm?: () => void;
   onClose: () => void;
 };
@@ -126,6 +128,8 @@ export function ConfirmationModal({
   recipientName,
   confirmLabel,
   doneLabel,
+  busy = false,
+  busyLabel = "Sending…",
   onConfirm,
   onClose,
 }: ConfirmationModalProps) {
@@ -160,7 +164,11 @@ export function ConfirmationModal({
 
   return (
     <OverlayPortal>
-      <div className="confirm-modal-root" role="presentation" onClick={onClose}>
+      <div
+        className="confirm-modal-root"
+        role="presentation"
+        onClick={busy ? undefined : onClose}
+      >
       <div
         className="confirm-modal-panel animate-float-in"
         role="dialog"
@@ -197,12 +205,18 @@ export function ConfirmationModal({
           <button
             type="button"
             className="btn btn-gradient btn-block"
+            disabled={busy}
             onClick={isSuccess ? onClose : onConfirm}
           >
-            {primaryLabel}
+            {busy ? busyLabel : primaryLabel}
           </button>
           {!isSuccess && (
-            <button type="button" className="btn btn-light btn-block" onClick={onClose}>
+            <button
+              type="button"
+              className="btn btn-light btn-block"
+              disabled={busy}
+              onClick={onClose}
+            >
               Cancel
             </button>
           )}

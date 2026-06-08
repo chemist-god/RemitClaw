@@ -1,7 +1,12 @@
 import "dotenv/config";
 import { z } from "zod";
+import {
+  defaultIdentityRegistry,
+  defaultReputationRegistry,
+} from "../agent/registry-addresses.js";
 
-const ConfigSchema = z.object({
+const ConfigSchema = z
+  .object({
   celoRpcUrl: z.string().url(),
   celoChainId: z.coerce.number().default(42220),
   agentPrivateKey: z.string().optional(),
@@ -13,9 +18,61 @@ const ConfigSchema = z.object({
   dailyTransferLimitUsd: z.coerce.number().default(500),
   singleTransferLimitUsd: z.coerce.number().default(200),
   requireConfirmationAboveUsd: z.coerce.number().default(100),
+  slippageBps: z.coerce.number().default(50),
   dataDir: z.string().default("./data"),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
-});
+  agentApiPort: z.coerce.number().default(8787),
+  agentApiKey: z.string().optional(),
+  webOrigin: z.string().default("*"),
+  demoRecipientAddress: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
+
+  // ── ERC-8004 agent identity ──
+  identityRegistryAddress: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
+  reputationRegistryAddress: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
+  agentId: z.coerce.number().int().nonnegative().optional(),
+  agentUri: z.string().optional(),
+  agentName: z.string().default("Remifi"),
+  agentDescription: z
+    .string()
+    .default(
+      "AI remittance agent: send stablecoins across borders from a natural-language message, routed via Mento on Celo."
+    ),
+  agentImage: z.string().optional(),
+  publicBaseUrl: z.string().url().optional(),
+  publicAgentApiUrl: z.string().url().optional(),
+
+  // ── x402 payments ──
+  x402Enabled: z
+    .preprocess(
+      (v) => (typeof v === "string" ? /^(1|true|yes|on)$/i.test(v) : v),
+      z.boolean()
+    )
+    .default(false),
+  x402PriceUsd: z.coerce.number().nonnegative().default(0.01),
+  x402Network: z.string().default("celo"),
+  /** Settlement token for x402: USDC (default) or USDm. */
+  x402Token: z.string().default("USDC"),
+  /** thirdweb secret key — enables real x402 verify/settle via facilitator. */
+  thirdwebSecretKey: z.string().optional(),
+})
+  .transform((raw) => ({
+    ...raw,
+    identityRegistryAddress:
+      raw.identityRegistryAddress ??
+      defaultIdentityRegistry(raw.celoChainId),
+    reputationRegistryAddress:
+      raw.reputationRegistryAddress ??
+      defaultReputationRegistry(raw.celoChainId),
+  }));
 
 export type Config = z.infer<typeof ConfigSchema>;
 
@@ -32,7 +89,28 @@ export function loadConfig(): Config {
     dailyTransferLimitUsd: process.env.DAILY_TRANSFER_LIMIT_USD,
     singleTransferLimitUsd: process.env.SINGLE_TRANSFER_LIMIT_USD,
     requireConfirmationAboveUsd: process.env.REQUIRE_CONFIRMATION_ABOVE_USD,
+    slippageBps: process.env.SLIPPAGE_BPS,
     dataDir: process.env.DATA_DIR,
     logLevel: process.env.LOG_LEVEL,
+    agentApiPort: process.env.AGENT_API_PORT,
+    agentApiKey: process.env.AGENT_API_KEY,
+    webOrigin: process.env.WEB_ORIGIN,
+    demoRecipientAddress: process.env.DEMO_RECIPIENT_ADDRESS,
+
+    identityRegistryAddress: process.env.IDENTITY_REGISTRY_ADDRESS,
+    reputationRegistryAddress: process.env.REPUTATION_REGISTRY_ADDRESS,
+    agentId: process.env.AGENT_ID,
+    agentUri: process.env.AGENT_URI,
+    agentName: process.env.AGENT_NAME,
+    agentDescription: process.env.AGENT_DESCRIPTION,
+    agentImage: process.env.AGENT_IMAGE,
+    publicBaseUrl: process.env.PUBLIC_BASE_URL,
+    publicAgentApiUrl: process.env.PUBLIC_AGENT_API_URL,
+
+    x402Enabled: process.env.X402_ENABLED,
+    x402PriceUsd: process.env.X402_PRICE_USD,
+    x402Network: process.env.X402_NETWORK,
+    x402Token: process.env.X402_TOKEN,
+    thirdwebSecretKey: process.env.THIRDWEB_SECRET_KEY,
   });
 }

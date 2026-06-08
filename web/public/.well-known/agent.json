@@ -1,0 +1,33 @@
+{
+  "type": "Agent",
+  "name": "Remifi",
+  "description": "AI remittance agent: send stablecoins across borders from a natural-language message, routed via Mento on Celo.",
+  "image": "https://remitclaw.app/assets/img1.png",
+  "endpoints": [
+    {
+      "type": "a2a",
+      "url": "https://remitclaw.app/.well-known/agent.json"
+    },
+    {
+      "type": "http",
+      "url": "https://api.remitclaw.app"
+    },
+    {
+      "type": "x402",
+      "url": "https://api.remitclaw.app/api/x402/premium-quote"
+    }
+  ],
+  "services": [
+    { "name": "web", "endpoint": "https://remitclaw.app" },
+    { "name": "HTTP", "endpoint": "https://api.remitclaw.app", "version": "1.0.0" },
+    {
+      "name": "x402",
+      "endpoint": "https://api.remitclaw.app/api/x402/premium-quote",
+      "version": "1.0.0"
+    }
+  ],
+  "x402Support": true,
+  "active": true,
+  "registrations": [],
+  "supportedTrust": ["reputation", "validation", "tee"]
+}

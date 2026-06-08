@@ -145,9 +145,9 @@ export function OnboardingFlow() {
             <button
               type="button"
               className="btn btn-gradient btn-block"
-              onClick={() => router.push("/home?add=1")}
+              onClick={() => router.push("/auth")}
             >
-              Add your first contact
+              Create your wallet
             </button>
             <Link href="/home" className="btn btn-light btn-block">
               Maybe later

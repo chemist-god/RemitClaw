@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import { AddContactProvider } from "./context/AddContactContext";
-import { ContactsProvider } from "./context/ContactsContext";
-import { WalletPreferencesProvider } from "./context/WalletPreferencesContext";
+import { Providers } from "./components/Providers";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -34,11 +32,7 @@ export default function RootLayout({
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full">
         <div className="app-stage">
-          <ContactsProvider>
-            <WalletPreferencesProvider>
-              <AddContactProvider>{children}</AddContactProvider>
-            </WalletPreferencesProvider>
-          </ContactsProvider>
+          <Providers>{children}</Providers>
         </div>
       </body>
     </html>
