@@ -74,4 +74,31 @@ export function getDueSchedules(dataDir: string): ScheduleEntry[] {
   );
 }
 
+export function listSchedules(dataDir: string): ScheduleEntry[] {
+  return loadSchedules(dataDir).sort(
+    (a, b) => new Date(a.nextRunAt).getTime() - new Date(b.nextRunAt).getTime()
+  );
+}
+
+export function cancelSchedule(dataDir: string, id: string): boolean {
+  const schedules = loadSchedules(dataDir);
+  const next = schedules.filter((s) => s.id !== id);
+  if (next.length === schedules.length) return false;
+  writeFileSync(schedulesPath(dataDir), JSON.stringify(next, null, 2));
+  return true;
+}
+
+export function setScheduleActive(
+  dataDir: string,
+  id: string,
+  active: boolean
+): ScheduleEntry | null {
+  const schedules = loadSchedules(dataDir);
+  const idx = schedules.findIndex((s) => s.id === id);
+  if (idx < 0) return null;
+  schedules[idx] = { ...schedules[idx], active };
+  writeFileSync(schedulesPath(dataDir), JSON.stringify(schedules, null, 2));
+  return schedules[idx];
+}
+
 export type { ScheduleEntry };

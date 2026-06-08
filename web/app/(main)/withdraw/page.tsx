@@ -1,15 +1,10 @@
 import { PhoneShell } from "../../components/PhoneShell";
-import { TransferForm } from "../../components/TransferForm";
+import { WithdrawContent } from "../../components/WithdrawContent";
 
 export default function WithdrawScreen() {
   return (
     <PhoneShell>
-      <TransferForm
-        mode="withdraw"
-        title="Withdraw"
-        subtitle="Move funds from your wallet to a bank account or external address."
-        actionLabel="Confirm withdrawal"
-      />
+      <WithdrawContent />
     </PhoneShell>
   );
 }

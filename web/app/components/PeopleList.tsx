@@ -79,11 +79,6 @@ export function PeopleList() {
               <Link key={person.id} href={payLink(person.name)} className="people-grid-item">
                 <Avatar name={person.name} src={person.avatar} ring />
                 <span className="people-name">{person.name}</span>
-                {person.country && (
-                  <span className="text-[0.65rem] font-semibold uppercase text-soft">
-                    {person.country}
-                  </span>
-                )}
               </Link>
             ))}
           </div>

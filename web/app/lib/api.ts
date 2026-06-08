@@ -30,6 +30,7 @@ export type QuoteResponse = {
   scheduleNextRunAt?: string;
   deliveryMethod?: "wallet" | "escrow";
   matchedContact?: string;
+  exchangeRate?: number;
 };
 
 export type TransferResponse = {
@@ -117,6 +118,23 @@ export type HistoryResponse = {
   items: HistoryItem[];
 };
 
+export type ScheduleItem = {
+  id: string;
+  intent: {
+    amount: number;
+    sourceCurrency: string;
+    destinationCountry: string;
+    recipientName?: string;
+    frequency: string;
+  };
+  nextRunAt: string;
+  active: boolean;
+};
+
+export type SchedulesResponse = {
+  schedules: ScheduleItem[];
+};
+
 function headers(): Record<string, string> {
   const base: Record<string, string> = { "Content-Type": "application/json" };
   if (API_KEY) base["x-api-key"] = API_KEY;
@@ -187,6 +205,31 @@ export async function fetchBalances(address: string): Promise<BalanceResponse> {
 export async function fetchHistory(): Promise<HistoryResponse> {
   const res = await fetch(`${API_BASE}/api/history`, { headers: headers() });
   return handle<HistoryResponse>(res);
+}
+
+export async function fetchSchedules(): Promise<SchedulesResponse> {
+  const res = await fetch(`${API_BASE}/api/schedules`, { headers: headers() });
+  return handle<SchedulesResponse>(res);
+}
+
+export async function cancelSchedule(id: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`${API_BASE}/api/schedules/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  return handle<{ ok: boolean }>(res);
+}
+
+export async function toggleSchedule(
+  id: string,
+  active: boolean
+): Promise<{ schedule: ScheduleItem }> {
+  const res = await fetch(`${API_BASE}/api/schedules/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: headers(),
+    body: JSON.stringify({ active }),
+  });
+  return handle<{ schedule: ScheduleItem }>(res);
 }
 
 /** Sync contacts to the agent API so Telegram/WhatsApp/CLI can resolve names. */

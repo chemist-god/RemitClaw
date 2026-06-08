@@ -4,7 +4,13 @@ import type { RemittanceIntent } from "../types/index.js";
 import { parseRemittanceIntent } from "../intent/parser.js";
 import { prepareTransfer } from "../transfers/executor.js";
 import { compareFees, formatSavings } from "../fees/comparison.js";
-import { scheduleRecurringTransfer } from "../transfers/scheduler.js";
+import {
+  cancelSchedule,
+  listSchedules,
+  scheduleRecurringTransfer,
+  setScheduleActive,
+  type ScheduleEntry,
+} from "../transfers/scheduler.js";
 import { RemitClawAgent } from "../agent/remitclaw-agent.js";
 import { loadTransactions, saveTransaction } from "../history/store.js";
 import { CELO_MAINNET_TOKENS } from "../mento/client.js";
@@ -40,6 +46,8 @@ export interface QuoteResult {
   scheduleNextRunAt?: string;
   deliveryMethod?: "wallet" | "escrow";
   matchedContact?: string;
+  /** Live Mento implied rate: destination units per 1 source unit. */
+  exchangeRate?: number;
 }
 
 export interface ExecuteResult {
@@ -182,7 +190,25 @@ export async function quoteForMessage(
           ? "wallet"
           : undefined,
     matchedContact,
+    exchangeRate:
+      intent.amount > 0 ? recipientReceives / intent.amount : undefined,
   };
+}
+
+export function getSchedules(config: Config): ScheduleEntry[] {
+  return listSchedules(config.dataDir);
+}
+
+export function removeSchedule(config: Config, id: string): boolean {
+  return cancelSchedule(config.dataDir, id);
+}
+
+export function toggleSchedule(
+  config: Config,
+  id: string,
+  active: boolean
+): ScheduleEntry | null {
+  return setScheduleActive(config.dataDir, id, active);
 }
 
 /**

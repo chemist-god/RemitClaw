@@ -2,6 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { MobileSheet } from "./MobileSheet";
+import { QrScanner } from "./QrScanner";
+import { parseWalletFromQr } from "../lib/qr";
+import { useLanguage } from "../context/LanguageContext";
 
 type ScanSheetProps = {
   open: boolean;
@@ -10,42 +13,34 @@ type ScanSheetProps = {
 
 export function ScanSheet({ open, onClose }: ScanSheetProps) {
   const router = useRouter();
+  const { t } = useLanguage();
 
-  const simulateScan = () => {
+  const handleScan = (raw: string) => {
+    const wallet = parseWalletFromQr(raw);
+    if (wallet) {
+      onClose();
+      router.push(`/pay?wallet=${encodeURIComponent(wallet)}`);
+      return;
+    }
     onClose();
-    router.push("/pay?to=Sid&amount=25");
+    router.push(`/pay?to=${encodeURIComponent(raw)}`);
   };
 
   return (
     <MobileSheet
       open={open}
       onClose={onClose}
-      title="Scan QR"
-      subtitle="Pay someone by scanning their code"
+      title={t("scan.title")}
+      subtitle={t("scan.subtitle")}
       stacked
     >
-      <div className="scan-sheet-body">
-        <div className="scan-viewfinder" aria-hidden>
-          <span className="scan-corner scan-corner-tl" />
-          <span className="scan-corner scan-corner-tr" />
-          <span className="scan-corner scan-corner-bl" />
-          <span className="scan-corner scan-corner-br" />
-          <span className="scan-line" />
-        </div>
-
-        <p className="mt-5 text-center text-sm text-muted">
-          Point your camera at a RemitClaw QR code
-        </p>
-
-        <button
-          type="button"
-          className="btn btn-gradient btn-block mt-6"
-          onTouchStart={simulateScan}
-          onClick={simulateScan}
-        >
-          Simulate scan
-        </button>
-      </div>
+      <QrScanner
+        walletOnly={false}
+        onScan={handleScan}
+        onError={() => {
+          /* inline error in QrScanner */
+        }}
+      />
     </MobileSheet>
   );
 }

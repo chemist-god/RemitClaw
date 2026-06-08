@@ -8,6 +8,8 @@ import { canPickPhoneContacts, pickPhoneContact } from "../lib/phone-contacts";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { CountryPickerField } from "./CountryPickerSheet";
 import { Avatar } from "./Avatar";
+import { MobileSheet } from "./MobileSheet";
+import { QrScanner } from "./QrScanner";
 
 type AddContactFormProps = {
   onSaved: () => void;
@@ -25,6 +27,7 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPhase, setConfirmPhase] = useState<"confirm" | "success">("confirm");
   const [picking, setPicking] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const phonePickerAvailable = canPickPhoneContacts();
 
   const previewName = name.trim() || t("contact.contact");
@@ -111,10 +114,19 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
         </section>
 
         <section className="mt-5">
-          <label htmlFor="add-contact-wallet" className="form-label">
-            {t("contact.wallet")}{" "}
-            <span className="font-normal text-soft">{t("contact.walletOptional")}</span>
-          </label>
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="add-contact-wallet" className="form-label">
+              {t("contact.wallet")}{" "}
+              <span className="font-normal text-soft">{t("contact.walletOptional")}</span>
+            </label>
+            <button
+              type="button"
+              className="text-xs font-semibold text-brand-700 underline underline-offset-2"
+              onClick={() => setScanOpen(true)}
+            >
+              {t("contact.scanQr")}
+            </button>
+          </div>
           <input
             id="add-contact-wallet"
             type="text"
@@ -188,6 +200,21 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
         onConfirm={handleConfirm}
         onClose={handleCloseConfirm}
       />
+
+      <MobileSheet
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        title={t("contact.scanQr")}
+        subtitle={t("contact.scanQrHint")}
+      >
+        <QrScanner
+          walletOnly
+          onScan={(address) => {
+            setWalletAddress(address);
+            setScanOpen(false);
+          }}
+        />
+      </MobileSheet>
     </>
   );
 }

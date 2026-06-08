@@ -13,15 +13,6 @@ const WalletAssets = dynamic(
   }
 );
 
-const WalletRecent = dynamic(
-  () => import("../../components/WalletRecent").then((m) => m.WalletRecent),
-  {
-    loading: () => (
-      <div className="mt-7 h-48 animate-pulse rounded-[var(--radius-lg)] bg-surface-subtle" />
-    ),
-  }
-);
-
 export default function WalletScreen() {
   return (
     <PhoneShell nav="wallet">
@@ -30,7 +21,6 @@ export default function WalletScreen() {
         <BalanceSection />
         <ActionButtons />
         <WalletAssets />
-        <WalletRecent />
       </div>
     </PhoneShell>
   );
