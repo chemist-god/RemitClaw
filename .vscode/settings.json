@@ -1,0 +1,19 @@
+{
+  "solidity.monoRepoSupport": true,
+  "solidity.remappings": [
+    "forge-std/=contract/lib/forge-std/src/",
+    "src/=contract/src/",
+    "test/=contract/test/"
+  ],
+  "solidity.remappingsUnix": [
+    "forge-std/=contract/lib/forge-std/src/",
+    "src/=contract/src/",
+    "test/=contract/test/"
+  ],
+  "solidity.remappingsWindows": [
+    "forge-std/=contract/lib/forge-std/src/",
+    "src/=contract/src/",
+    "test/=contract/test/"
+  ],
+  "solidity.compileUsingRemoteVersion": "v0.8.24"
+}

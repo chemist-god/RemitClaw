@@ -35,12 +35,33 @@ export interface ExecuteResult {
   savings: string;
 }
 
+/** Optional contact fields from the web app (override parsed intent). */
+export interface TransferContext {
+  destinationCountry?: string;
+  recipientWallet?: string;
+  recipientPhone?: string;
+}
+
+function applyTransferContext(
+  intent: RemittanceIntent,
+  ctx?: TransferContext
+): RemittanceIntent {
+  if (!ctx) return intent;
+  return {
+    ...intent,
+    destinationCountry: ctx.destinationCountry ?? intent.destinationCountry,
+    recipientWallet: ctx.recipientWallet ?? intent.recipientWallet,
+    recipientPhone: ctx.recipientPhone ?? intent.recipientPhone,
+  };
+}
+
 /** Parse a message and (for one-time sends) attach a live Mento quote + fee comparison. */
 export async function quoteForMessage(
   config: Config,
-  message: string
+  message: string,
+  ctx?: TransferContext
 ): Promise<QuoteResult> {
-  const intent = parseRemittanceIntent(message);
+  const intent = applyTransferContext(parseRemittanceIntent(message), ctx);
 
   if (intent.frequency !== "once") {
     const schedule = scheduleRecurringTransfer(config.dataDir, intent);
@@ -99,11 +120,11 @@ export async function quoteForMessage(
 export async function executeForMessage(
   config: Config,
   message: string,
-  recipientWallet?: string
+  ctx?: TransferContext
 ): Promise<ExecuteResult> {
-  const intent = parseRemittanceIntent(message);
+  const intent = applyTransferContext(parseRemittanceIntent(message), ctx);
   const recipient =
-    recipientWallet || intent.recipientWallet || config.demoRecipientAddress;
+    ctx?.recipientWallet || intent.recipientWallet || config.demoRecipientAddress;
 
   if (!recipient) {
     throw new Error(
@@ -190,6 +211,8 @@ export async function getBalances(
     { symbol: "USDm", address: CELO_MAINNET_TOKENS.USDm },
     { symbol: "EURm", address: CELO_MAINNET_TOKENS.EURm },
     { symbol: "BRLm", address: CELO_MAINNET_TOKENS.BRLm },
+    { symbol: "PHPm", address: CELO_MAINNET_TOKENS.PHPm },
+    { symbol: "NGNm", address: CELO_MAINNET_TOKENS.NGNm },
   ];
 
   const results = await Promise.all(

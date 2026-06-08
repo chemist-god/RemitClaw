@@ -3,6 +3,12 @@ const API_BASE =
 
 const API_KEY = process.env.NEXT_PUBLIC_AGENT_API_KEY;
 
+export type TransferContext = {
+  destinationCountry?: string;
+  recipientWallet?: string;
+  recipientPhone?: string;
+};
+
 export type QuoteResponse = {
   kind: "quote" | "schedule";
   intent: {
@@ -34,14 +40,43 @@ export type TransferResponse = {
   savings: string;
 };
 
+export type BalanceItem = {
+  symbol: string;
+  address: string;
+  balance: number;
+};
+
 export type BalanceResponse = {
   address: string;
-  items: { symbol: string; address: string; balance: number }[];
+  items: BalanceItem[];
 };
 
 export type AgentResponse = {
   address: string | null;
   chainId: number;
+  agentId?: number | null;
+  registered?: boolean;
+};
+
+export type HealthResponse = {
+  ok: boolean;
+  chainId: number;
+  executionReady: boolean;
+};
+
+export type HistoryItem = {
+  id: string;
+  status: string;
+  amount: number;
+  sourceCurrency: string;
+  destinationCountry: string;
+  recipientName?: string;
+  txHash?: string;
+  createdAt: string;
+};
+
+export type HistoryResponse = {
+  items: HistoryItem[];
 };
 
 function headers(): Record<string, string> {
@@ -53,17 +88,32 @@ function headers(): Record<string, string> {
 async function handle<T>(res: Response): Promise<T> {
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? `Request failed (${res.status})`);
+    throw new Error(
+      (data as { error?: string }).error ?? `Request failed (${res.status})`
+    );
   }
   return data;
 }
 
+export function agentApiBase(): string {
+  return API_BASE;
+}
+
+/** Agent readiness (quotes work when ok; transfers need executionReady). */
+export async function fetchHealth(): Promise<HealthResponse> {
+  const res = await fetch(`${API_BASE}/api/health`, { headers: headers() });
+  return handle<HealthResponse>(res);
+}
+
 /** Parse a message and fetch a live Mento quote + fee comparison (no execution). */
-export async function fetchQuote(message: string): Promise<QuoteResponse> {
+export async function fetchQuote(
+  message: string,
+  ctx?: TransferContext
+): Promise<QuoteResponse> {
   const res = await fetch(`${API_BASE}/api/intent`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, ...ctx }),
   });
   return handle<QuoteResponse>(res);
 }
@@ -71,18 +121,18 @@ export async function fetchQuote(message: string): Promise<QuoteResponse> {
 /** Execute a transfer derived from a message. Returns a real txHash on success. */
 export async function executeTransfer(
   message: string,
-  recipientWallet?: string
+  ctx?: TransferContext
 ): Promise<TransferResponse> {
   const res = await fetch(`${API_BASE}/api/transfer`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({ message, recipientWallet }),
+    body: JSON.stringify({ message, ...ctx }),
   });
   return handle<TransferResponse>(res);
 }
 
-/** The agent's own on-chain address (Model A wallet) used for demo balances. */
-export async function fetchAgentAddress(): Promise<AgentResponse> {
+/** The agent's on-chain address (Model A wallet) used for demo balances. */
+export async function fetchAgentInfo(): Promise<AgentResponse> {
   const res = await fetch(`${API_BASE}/api/agent`, { headers: headers() });
   return handle<AgentResponse>(res);
 }
@@ -95,9 +145,34 @@ export async function fetchBalances(address: string): Promise<BalanceResponse> {
   return handle<BalanceResponse>(res);
 }
 
+/** Transfer history from the agent store (data/transactions.json). */
+export async function fetchHistory(): Promise<HistoryResponse> {
+  const res = await fetch(`${API_BASE}/api/history`, { headers: headers() });
+  return handle<HistoryResponse>(res);
+}
+
 /** Celo explorer tx link (mainnet by default; Sepolia uses celo-sepolia subdomain). */
 export function explorerTxUrl(txHash: string): string {
   const base =
     process.env.NEXT_PUBLIC_CELO_EXPLORER ?? "https://celoscan.io";
   return `${base}/tx/${txHash}`;
+}
+
+/** Format ISO timestamp for recent tx list. */
+export function formatTxDate(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear();
+  if (sameDay) return "Today";
+  if (isYesterday) return "Yesterday";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

@@ -4,14 +4,23 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Avatar } from "./Avatar";
+import { AgentStatusBanner } from "./AgentStatusBanner";
 import { ConfirmationModal, type ConfirmationDetail } from "./ConfirmationModal";
 import { ASSISTANT, PROFILE } from "../data/people";
 import { BoltIcon, ChevronLeftIcon, MicIcon } from "./icons";
+import { useAgentApi } from "../context/AgentApiContext";
+import { useContacts } from "../context/ContactsContext";
+import {
+  contactTransferContext,
+  enrichMessageWithContact,
+  matchContact,
+} from "../lib/contacts";
 import {
   executeTransfer,
   explorerTxUrl,
   fetchQuote,
   type QuoteResponse,
+  type TransferContext,
 } from "../lib/api";
 
 type Message =
@@ -20,12 +29,18 @@ type Message =
       role: "bot";
       text: string;
       txHash?: string;
-      confirm?: { label: string; message: string; quote: QuoteResponse };
+      confirm?: {
+        label: string;
+        message: string;
+        quote: QuoteResponse;
+        ctx?: TransferContext;
+      };
     }
   | { id: string; role: "user"; text: string };
 
 const QUICK_REPLIES = [
   { label: "Send $50 to Mom" },
+  { label: "Enviar 50 dólares a Mamá" },
   { label: "Send 100 USDm to Dad" },
 ];
 
@@ -34,7 +49,7 @@ function introMessages(): Message[] {
     {
       id: "intro",
       role: "bot",
-      text: `Hi! I'm your AI payment assistant. Just tell me who you want to send money to and how much. Try saying "Send $50 to Mom" or "Send 100 USDm to Dad".`,
+      text: `Hi! I'm your Remifi payment assistant — powered by the agent API. Tell me who to pay and how much in English, Spanish, Portuguese, or French — e.g. "Send $50 to Mom" or "Enviar 50 dólares a Mamá". I'll fetch a live Mento quote, then you confirm to send on Celo.`,
     },
   ];
 }
@@ -44,9 +59,10 @@ type PendingPayment = {
   recipientName: string;
   quote: QuoteResponse;
   details: ConfirmationDetail[];
+  ctx?: TransferContext;
 };
 
-function quoteDetails(quote: QuoteResponse): ConfirmationDetail[] {
+function quoteDetails(quote: QuoteResponse, ctx?: TransferContext): ConfirmationDetail[] {
   const { intent } = quote;
   const rows: ConfirmationDetail[] = [
     { label: "To", value: intent.recipientName ?? "Recipient" },
@@ -71,6 +87,14 @@ function quoteDetails(quote: QuoteResponse): ConfirmationDetail[] {
       value: `~$${quote.estimatedGasUsd.toFixed(4)}`,
     });
   }
+  if (ctx?.recipientWallet) {
+    rows.push({
+      label: "Wallet",
+      value: `${ctx.recipientWallet.slice(0, 6)}…${ctx.recipientWallet.slice(-4)}`,
+    });
+  } else if (ctx?.recipientPhone) {
+    rows.push({ label: "Phone", value: ctx.recipientPhone });
+  }
   return rows;
 }
 
@@ -78,6 +102,8 @@ export function PayChat() {
   const searchParams = useSearchParams();
   const presetTo = searchParams.get("to");
   const presetAmount = searchParams.get("amount");
+  const { allPeople } = useContacts();
+  const { refreshBalances } = useAgentApi();
 
   const [input, setInput] = useState(
     presetTo && presetAmount
@@ -102,6 +128,17 @@ export function PayChat() {
       { id: crypto.randomUUID(), role: "bot", ...msg },
     ]);
 
+  const contactForMessage = (text: string) => {
+    if (presetTo) {
+      const preset = matchContact(presetTo, allPeople);
+      if (preset) return preset;
+    }
+    const tail = text.match(/\bto\s+(.+)$/i)?.[1];
+    if (!tail) return undefined;
+    const name = tail.replace(/\s+in\s+.+$/i, "").trim();
+    return matchContact(name, allPeople);
+  };
+
   const sendMessage = async (text: string, silent = false) => {
     const trimmed = text.trim();
     if (!trimmed || thinking) return;
@@ -114,26 +151,42 @@ export function PayChat() {
     setThinking(true);
 
     try {
-      const quote = await fetchQuote(trimmed);
+      const activeContact = contactForMessage(trimmed);
+      const ctx = contactTransferContext(activeContact);
+      const apiMessage = enrichMessageWithContact(trimmed, activeContact);
+
+      const quote = await fetchQuote(apiMessage, ctx);
 
       if (quote.kind === "schedule") {
         appendBot({ text: quote.summary });
         return;
       }
 
-      const recipientName = quote.intent.recipientName ?? "your recipient";
+      const recipientName =
+        quote.intent.recipientName ?? activeContact?.name ?? "your recipient";
+
+      let extra = "";
+      if (!ctx?.recipientWallet && !ctx?.recipientPhone) {
+        extra =
+          "\n\nAdd a wallet or phone on the contact for delivery. Sends use DEMO_RECIPIENT_ADDRESS until then.";
+      } else if (!ctx?.recipientWallet && ctx?.recipientPhone) {
+        extra =
+          "\n\nPhone on file — claim escrow not live yet; set a wallet on the contact or DEMO_RECIPIENT_ADDRESS for on-chain send.";
+      }
+
       appendBot({
-        text: quote.summary,
+        text: `${quote.summary}${quote.savings ? `\n${quote.savings}` : ""}${extra}`,
         confirm: {
           label: `Confirm ${quote.intent.amount} ${quote.intent.sourceCurrency} to ${recipientName}`,
-          message: trimmed,
+          message: apiMessage,
           quote,
+          ctx,
         },
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : "Something went wrong";
       appendBot({
-        text: `I couldn't put together that transfer. ${reason}. Try something like "Send $50 to Mom".`,
+        text: `I couldn't put together that transfer. ${reason}. Is the agent API running? (npm run serve)`,
       });
     } finally {
       setThinking(false);
@@ -153,12 +206,14 @@ export function PayChat() {
   const openPaymentModal = (confirm: {
     message: string;
     quote: QuoteResponse;
+    ctx?: TransferContext;
   }) => {
     setPendingPayment({
       message: confirm.message,
       recipientName: confirm.quote.intent.recipientName ?? "your recipient",
       quote: confirm.quote,
-      details: quoteDetails(confirm.quote),
+      details: quoteDetails(confirm.quote, confirm.ctx),
+      ctx: confirm.ctx,
     });
     setModalPhase("confirm");
     setModalOpen(true);
@@ -168,8 +223,12 @@ export function PayChat() {
     if (!pendingPayment || submitting) return;
     setSubmitting(true);
     try {
-      const result = await executeTransfer(pendingPayment.message);
+      const result = await executeTransfer(
+        pendingPayment.message,
+        pendingPayment.ctx
+      );
       setModalPhase("success");
+      await refreshBalances();
       appendBot({
         text:
           `Done! ${result.summary}. ${result.savings}` +
@@ -201,6 +260,8 @@ export function PayChat() {
         <h1 className="flex-1 text-center text-[1.05rem] font-bold">AI Pay</h1>
         <span className="w-10" />
       </header>
+
+      <AgentStatusBanner />
 
       <div className="screen screen-has-composer gap-4 px-5">
         {messages.map((msg) =>
@@ -248,7 +309,7 @@ export function PayChat() {
               <Avatar name={ASSISTANT.name} src={ASSISTANT.avatar} size={26} ring />
               <span className="text-xs font-bold text-brand-700">{ASSISTANT.name}</span>
             </div>
-            <div className="bubble bubble-bot text-soft">Getting a live quote…</div>
+            <div className="bubble bubble-bot text-soft">Getting a live Mento quote…</div>
           </div>
         )}
       </div>
@@ -297,7 +358,7 @@ export function PayChat() {
         recipientName={pendingPayment?.recipientName}
         message={
           modalPhase === "success"
-            ? "Your transfer is confirmed on Celo. The recipient will be notified."
+            ? "Your transfer is confirmed on Celo via the agent API."
             : pendingPayment?.quote.savings
         }
         details={pendingPayment?.details}

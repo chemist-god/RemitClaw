@@ -49,6 +49,22 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
   });
 }
 
+function transferContext(body: Record<string, unknown>) {
+  const ctx: {
+    destinationCountry?: string;
+    recipientWallet?: string;
+    recipientPhone?: string;
+  } = {};
+  if (body.destinationCountry) {
+    ctx.destinationCountry = String(body.destinationCountry).toUpperCase();
+  }
+  if (body.recipientWallet && /^0x[a-fA-F0-9]{40}$/.test(String(body.recipientWallet))) {
+    ctx.recipientWallet = String(body.recipientWallet);
+  }
+  if (body.recipientPhone) ctx.recipientPhone = String(body.recipientPhone);
+  return Object.keys(ctx).length ? ctx : undefined;
+}
+
 /** Optional shared-secret check (skipped if AGENT_API_KEY is unset). */
 function authorized(req: IncomingMessage, cfg: Config): boolean {
   if (!cfg.agentApiKey) return true;
@@ -131,7 +147,7 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req);
       const message = String(body.message ?? "").trim();
       if (!message) return sendJson(res, 400, { error: "message is required" });
-      const result = await quoteForMessage(config, message);
+      const result = await quoteForMessage(config, message, transferContext(body));
       return sendJson(res, 200, result);
     }
 
@@ -139,10 +155,7 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req);
       const message = String(body.message ?? "").trim();
       if (!message) return sendJson(res, 400, { error: "message is required" });
-      const recipientWallet = body.recipientWallet
-        ? String(body.recipientWallet)
-        : undefined;
-      const result = await executeForMessage(config, message, recipientWallet);
+      const result = await executeForMessage(config, message, transferContext(body));
       return sendJson(res, 200, result);
     }
 

@@ -17,6 +17,7 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
   const [name, setName] = useState("");
   const [country, setCountry] = useState("PH");
   const [phone, setPhone] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
   const [favourite, setFavourite] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPhase, setConfirmPhase] = useState<"confirm" | "success">("confirm");
@@ -29,6 +30,9 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
       { label: "Name", value: name.trim() },
       { label: "Country", value: countryLabel },
       ...(phone.trim() ? [{ label: "Phone", value: phone.trim() }] : []),
+      ...(walletAddress.trim()
+        ? [{ label: "Wallet", value: `${walletAddress.trim().slice(0, 8)}…` }]
+        : []),
       { label: "Favourite", value: favourite ? "Yes" : "No" },
     ],
     [countryLabel, favourite, name, phone]
@@ -86,6 +90,22 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
 
         <section className="mt-5">
           <CountryPickerField value={country} onChange={setCountry} />
+        </section>
+
+        <section className="mt-5">
+          <label htmlFor="add-contact-wallet" className="form-label">
+            Celo wallet <span className="font-normal text-soft">(optional)</span>
+          </label>
+          <input
+            id="add-contact-wallet"
+            type="text"
+            value={walletAddress}
+            onChange={(e) => setWalletAddress(e.target.value)}
+            placeholder="0x… for direct on-chain delivery"
+            className="form-field mt-2 w-full font-mono text-sm"
+            autoComplete="off"
+            spellCheck={false}
+          />
         </section>
 
         <section className="mt-5">

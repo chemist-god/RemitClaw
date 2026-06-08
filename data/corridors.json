@@ -5,8 +5,8 @@
     "destinationCurrency": "PHP",
     "destinationCountry": "PH",
     "sourceToken": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
-    "destinationToken": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
-    "mentoPair": "USDm→PHP"
+    "destinationToken": "0x105d4A9306D2E55a71d2Eb95B81553AE1dC20d7B",
+    "mentoPair": "USDm→PHPm"
   },
   {
     "id": "eur-ngn",
@@ -14,8 +14,8 @@
     "destinationCurrency": "NGN",
     "destinationCountry": "NG",
     "sourceToken": "0x10c826A163F5c566a514aFC6a0a7CA779128f0e0",
-    "destinationToken": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
-    "mentoPair": "EURm→NGN"
+    "destinationToken": "0xE2702Bd97ee33c88c8f6f92DA3B733608aa76F71",
+    "mentoPair": "EURm→NGNm"
   },
   {
     "id": "gbp-kes",
