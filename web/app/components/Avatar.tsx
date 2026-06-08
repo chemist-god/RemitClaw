@@ -20,11 +20,13 @@ export function Avatar({
   src,
   size = 52,
   ring = false,
+  priority = false,
 }: {
   name: string;
   src?: string;
   size?: number;
   ring?: boolean;
+  priority?: boolean;
 }) {
   const inner = src ? (
     <Image
@@ -32,7 +34,10 @@ export function Avatar({
       alt={name}
       width={size}
       height={size}
-      unoptimized
+      priority={priority}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "auto"}
+      sizes={`${size}px`}
       className="rounded-full object-cover bg-surface-lavender"
       style={{
         width: size,

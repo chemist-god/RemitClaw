@@ -2,15 +2,15 @@ import type { NextConfig } from "next";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Monorepo root (RemitClaw/) — must match for outputFileTracingRoot + turbopack.root. */
 const webDir = path.dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = path.resolve(webDir, "..");
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
   turbopack: {
-    root: monorepoRoot,
+    root: webDir,
   },
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       {
@@ -19,6 +19,18 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+    minimumCacheTTL: 60 * 60 * 24 * 7,
+  },
+  experimental: {
+    optimizePackageImports: [
+      "thirdweb",
+      "thirdweb/react",
+      "thirdweb/wallets",
+      "thirdweb/extensions",
+      "thirdweb/chains",
+    ],
+    // Safe with turbopack.root = webDir; use `npm run dev:clean` if cache corrupts.
+    turbopackFileSystemCacheForDev: true,
   },
 };
 

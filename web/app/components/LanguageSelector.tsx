@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
 import type { UiLocale } from "../i18n/types";
-import { CheckIcon, ChevronDownIcon } from "./icons";
+import { CheckIcon } from "./icons";
 import { MobileSheet } from "./MobileSheet";
 
 const LOCALE_FLAGS: Record<UiLocale, string> = {
@@ -89,11 +89,7 @@ export function LanguageSelector({ variant = "chips" }: LanguageSelectorProps) {
           onTouchStart={() => setPickerOpen(true)}
           onClick={() => setPickerOpen(true)}
         >
-          <span className="lang-picker-flag" aria-hidden>
-            {LOCALE_FLAGS[locale]}
-          </span>
-          <span className="lang-picker-code">{locale.toUpperCase()}</span>
-          <ChevronDownIcon className="lang-picker-chevron" aria-hidden />
+          {locale.toUpperCase()}
         </button>
 
         <LanguagePickerSheet

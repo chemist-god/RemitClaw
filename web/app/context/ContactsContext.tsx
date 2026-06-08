@@ -17,6 +17,7 @@ import {
   syncContacts,
   type StoredContact,
 } from "../lib/api";
+import { deferNonCritical } from "../lib/defer";
 import { pickPhoneContacts } from "../lib/phone-contacts";
 
 const STORAGE_KEY = "remitclaw-added-contacts";
@@ -141,14 +142,16 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
 
-    void (async () => {
-      try {
-        const { contacts } = await fetchContacts();
-        setRemote(contacts);
-      } catch {
-        // Fall back to local-only contacts.
-      }
-    })();
+    return deferNonCritical(() => {
+      void (async () => {
+        try {
+          const { contacts } = await fetchContacts();
+          setRemote(contacts);
+        } catch {
+          // Fall back to local-only contacts.
+        }
+      })();
+    });
   }, [ready]);
 
   const allPeople = useMemo(() => mergePeople(added, remote), [added, remote]);

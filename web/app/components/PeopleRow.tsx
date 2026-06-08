@@ -11,10 +11,12 @@ export function PeopleRow({
   people,
   title,
   showMore = true,
+  priority = false,
 }: {
   people: Person[];
   title?: string;
   showMore?: boolean;
+  priority?: boolean;
 }) {
   const { t } = useLanguage();
   const heading = title ?? t("home.people");
@@ -23,13 +25,17 @@ export function PeopleRow({
     <section className="mt-7">
       <h2 className="text-[1.05rem] text-ink">{heading}</h2>
       <div className="people-scroll mt-3">
-        {people.map((person) => (
+        {people.map((person, index) => (
           <Link
             key={person.id}
             href={payLink(person.name)}
             className="people-item"
           >
-            <Avatar name={person.name} src={person.avatar} />
+            <Avatar
+              name={person.name}
+              src={person.avatar}
+              priority={priority && index === 0}
+            />
             <span className="people-name">{person.name}</span>
           </Link>
         ))}

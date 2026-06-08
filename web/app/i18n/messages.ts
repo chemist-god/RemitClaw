@@ -167,8 +167,8 @@ export const messages = {
       withdraw: "Retirar",
       people: "Personas",
       favourite: "Favoritos",
-      tryAiPay: "Probar AI Pay",
-      tryAiPayHint: "¿No quieres escribir direcciones? Solo pregunta.",
+      tryAiPay: "Prueba AI Pay",
+      tryAiPayHint: "¿Sin escribir direcciones? Solo dilo.",
     },
     pay: {
       title: "AI Pay",

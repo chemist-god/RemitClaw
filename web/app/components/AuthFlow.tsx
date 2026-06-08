@@ -35,6 +35,9 @@ export function AuthFlow() {
             width={520}
             height={360}
             priority
+            loading="eager"
+            fetchPriority="high"
+            sizes="(max-width: 440px) 78vw, 300px"
             className="animate-coin-bob relative w-[78%] max-w-[300px] drop-shadow-2xl"
           />
         </div>

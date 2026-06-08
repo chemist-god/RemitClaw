@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { FAVOURITES } from "../data/people";
 import { Avatar } from "./Avatar";
 import { BoltIcon } from "./icons";
 import { useLanguage } from "../context/LanguageContext";
@@ -21,6 +22,9 @@ function StepHero({ step }: { step: "welcome" | "ai-pay" | "people" }) {
           width={520}
           height={360}
           priority
+          loading="eager"
+          fetchPriority="high"
+          sizes="(max-width: 440px) 88vw, 340px"
           className="animate-coin-bob relative w-[88%] max-w-[340px] drop-shadow-2xl"
         />
       </div>
@@ -50,10 +54,15 @@ function StepHero({ step }: { step: "welcome" | "ai-pay" | "people" }) {
   return (
     <div className="relative mt-6 flex flex-1 flex-col items-center justify-center">
       <div className="people-scroll w-full justify-center px-2">
-        {["Mom", "Dad", "Sister"].map((name) => (
-          <div key={name} className="people-item pointer-events-none">
-            <Avatar name={name} ring />
-            <span className="people-name">{name}</span>
+        {FAVOURITES.map((person, index) => (
+          <div key={person.id} className="people-item pointer-events-none">
+            <Avatar
+              name={person.name}
+              src={person.avatar}
+              ring
+              priority={index === 0}
+            />
+            <span className="people-name">{person.name}</span>
           </div>
         ))}
         <div className="people-item pointer-events-none">

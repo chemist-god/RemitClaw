@@ -1,13 +1,30 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Avatar } from "./Avatar";
-import { LanguageSelector } from "./LanguageSelector";
-import { ProfileWalletCard } from "./ProfileWalletCard";
-import { WalletAssets } from "./WalletAssets";
-import { ChevronLeftIcon } from "./icons";
 import { PROFILE } from "../data/people";
 import { useLanguage } from "../context/LanguageContext";
+import { Avatar } from "./Avatar";
+import { LanguageSelector } from "./LanguageSelector";
+import { ChevronLeftIcon } from "./icons";
+
+const ProfileWalletCard = dynamic(
+  () => import("./ProfileWalletCard").then((m) => m.ProfileWalletCard),
+  {
+    loading: () => (
+      <div className="mt-6 h-28 animate-pulse rounded-[var(--radius-lg)] bg-surface-subtle" />
+    ),
+  }
+);
+
+const WalletAssets = dynamic(
+  () => import("./WalletAssets").then((m) => m.WalletAssets),
+  {
+    loading: () => (
+      <div className="mt-7 h-40 animate-pulse rounded-[var(--radius-lg)] bg-surface-subtle" />
+    ),
+  }
+);
 
 export function ProfileContent() {
   const { t } = useLanguage();

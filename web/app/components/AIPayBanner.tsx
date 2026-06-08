@@ -23,6 +23,10 @@ export function AIPayBanner() {
           alt=""
           width={320}
           height={220}
+          priority
+          loading="eager"
+          fetchPriority="high"
+          sizes="216px"
           aria-hidden
           className="ai-pay-coins pointer-events-none"
         />

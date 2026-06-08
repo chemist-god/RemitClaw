@@ -7,7 +7,13 @@ import { useLanguage } from "../context/LanguageContext";
 import { Avatar } from "./Avatar";
 import { AddContactButton } from "./AddContactButton";
 
-export function FavouritesRow({ favourites }: { favourites: Person[] }) {
+export function FavouritesRow({
+  favourites,
+  priority = false,
+}: {
+  favourites: Person[];
+  priority?: boolean;
+}) {
   const { t } = useLanguage();
 
   return (
@@ -15,9 +21,13 @@ export function FavouritesRow({ favourites }: { favourites: Person[] }) {
       <h2 className="text-[1.05rem] text-ink">{t("home.favourite")}</h2>
       <div className="people-scroll mt-3">
         <AddContactButton />
-        {favourites.map((person) => (
+        {favourites.map((person, index) => (
           <Link key={person.id} href={payLink(person.name)} className="people-item">
-            <Avatar name={person.name} src={person.avatar} />
+            <Avatar
+              name={person.name}
+              src={person.avatar}
+              priority={priority && index === 0}
+            />
             <span className="people-name">{person.name}</span>
           </Link>
         ))}
