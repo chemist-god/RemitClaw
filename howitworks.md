@@ -1,6 +1,6 @@
 # Remifi — How It Works
 
-A step-by-step guide to the product vision, user flows, on-chain architecture, and hackathon strategy for **Remifi**: an AI remittance agent on Celo that turns natural language into cross-border stablecoin transfers via Mento.
+A step-by-step guide to the product vision, user flows, on-chain architecture, and hackathon strategy for **Remifi**: a **multilingual** AI remittance agent on Celo that turns natural language into cross-border stablecoin transfers via Mento — in English, Spanish, Portuguese, and French.
 
 ---
 
@@ -27,14 +27,16 @@ A step-by-step guide to the product vision, user flows, on-chain architecture, a
 
 ## 1. What Remifi is
 
-**Remifi** is an AI-powered remittance agent for Celo. Users say things like:
+**Remifi** is a **multilingual** AI-powered remittance agent for Celo. Users say things like — in any supported language:
 
-- *"Send $50 to my mom in the Philippines"*
-- *"Transfer 100 euros to my brother in Nigeria every month"*
+- *"Send $50 to my mom in the Philippines"* (English)
+- *"Enviar 50 dólares a mi mamá en Filipinas"* (Spanish)
+- *"Transferir 100 euros para meu irmão na Nigéria todo mês"* (Portuguese)
+- *"Envoyer 50 euros à mon frère au Nigeria"* (French)
 
 The agent:
 
-1. **Understands** the request (amount, currency, destination, schedule, recipient).
+1. **Understands** the request in EN / ES / PT / FR (amount, currency, destination, schedule, recipient) — locale auto-detected via `src/intent/locales/`.
 2. **Routes** the transfer through **Mento Protocol** stablecoin pools on Celo.
 3. **Compares fees** against Western Union and Wise so users see savings.
 4. **Executes** the on-chain swap and transfer (when wired).
@@ -51,7 +53,7 @@ Think **bankrbot**, but optimized for remittances on Celo — mobile-first, stab
 |------------------------|-----------|
 | High fees (4–8%+ via Western Union) | Mento routes + low Celo gas |
 | Slow settlement (hours to days) | Near-instant on-chain settlement |
-| Complex forms and FX jargon | Natural language + AI Pay chat |
+| Complex forms and FX jargon | Natural language + AI Pay chat (EN / ES / PT / FR) |
 | Opaque exchange rates | Fee comparison before send |
 | Requires bank branches | Mobile wallet + global corridors |
 
@@ -120,7 +122,7 @@ flowchart TB
   U2 --> OC --> AGENT
   U3 --> AGENT
 
-  WEB -.->|planned API| AGENT
+  WEB -->|HTTP API :8787| AGENT
   AGENT --> NLU
   AGENT --> EXEC
   EXEC --> FEES
@@ -135,9 +137,9 @@ flowchart TB
 
 | Surface | Purpose | Status |
 |---------|---------|--------|
-| **`web/`** | Mobile-first UI: onboarding, wallet view, contacts, AI Pay chat | UI built; on-chain wiring planned |
+| **`web/`** | Mobile-first UI: onboarding, wallet, contacts, AI Pay chat | ✅ Wired to agent API (`/api/intent`, `/api/transfer`, balances, history) |
 | **`src/`** | Agent core: parse, quote, execute, notify, history | Parser, Mento quotes, fees, limits, **on-chain execution** built; escrow vault planned |
-| **OpenClaw** | Conversational agent on messaging channels | Configured via `openclaw.json` + `skills/remitclaw/SKILL.md` |
+| **OpenClaw** | Conversational agent on messaging channels | Configured via `openclaw.json` + `skills/remifi/SKILL.md` |
 
 ---
 
@@ -148,7 +150,7 @@ flowchart TB
 | Step | Screen | What happens |
 |------|--------|--------------|
 | 1 | **Onboarding** (`/`) | 3-step intro: Send crypto simply → AI Pay → Add people |
-| 2 | **Auth** (planned) | Thirdweb: email / social / connect wallet on Celo |
+| 2 | **Auth** (`/auth`) | Thirdweb: email / social / connect wallet on Celo |
 | 3 | **Home** (`/home`) | Balance, deposit/withdraw/send actions, favourites |
 
 ### Phase B — Build your recipient list
@@ -156,7 +158,7 @@ flowchart TB
 | Step | Action | What happens |
 |------|--------|--------------|
 | 4 | Tap **+ Add** on Favourites | Bottom sheet opens (`AddContactSheet`) |
-| 5 | Fill form | Name (required), country (corridor), phone (optional), favourite |
+| 5 | Fill form | Name (required), country (corridor), phone (optional), wallet `0x` (optional), favourite |
 | 6 | Save contact | Stored in browser `localStorage` via `ContactsContext` |
 | 7 | Confirmation modal | “Contact saved” — no blockchain yet |
 
@@ -167,17 +169,17 @@ flowchart TB
 | Step | Screen | What happens |
 |------|--------|--------------|
 | 8 | Open **AI Pay** (`/pay`) | Chat UI with Remifi assistant |
-| 9 | User types or taps quick reply | e.g. *"Send $50 to Mom in the Philippines"* |
-| 10 | Intent parsed (client-side demo) | Extracts amount + recipient name; looks up contact for country |
-| 11 | Bot replies with route summary | Mento route, estimated fee (~$0.12) |
+| 9 | User types or taps quick reply | Any supported language, e.g. *"Send $50 to Mom in the Philippines"* or *"Enviar 50 dólares a Mamá en Filipinas"* |
+| 10 | Message sent to agent API | `POST /api/intent` — parse + live Mento quote; contact country/wallet passed |
+| 11 | Bot replies with route summary | Mento pair, recipient receives, fees, savings vs WU/Wise |
 | 12 | User taps **Confirm** | Confirmation modal: amount, recipient, corridor |
-| 13 | Success | Bot message: transfer on its way + notification (UI only today) |
+| 13 | Success | `POST /api/transfer` → real `txHash`; history + balances refresh from API |
 
 ### Phase D — Wallet and history
 
 | Step | Screen | What happens |
 |------|--------|--------------|
-| 14 | **Wallet** (`/wallet`) | Asset list (USDm, EURm, BRLm), recent transactions |
+| 14 | **Wallet** (`/wallet`) | Live balances + recent txs from agent API (`/api/balance`, `/api/history`) |
 | 15 | **Deposit / Withdraw** | Forms with confirmation modals (demo flows) |
 | 16 | **Profile** | Account info, settings |
 
@@ -196,7 +198,7 @@ sequenceDiagram
   participant Celo
   participant Twilio
 
-  User->>OpenClaw: Send $50 to my mom in the Philippines
+  User->>OpenClaw: Enviar 50 dólares a mi mamá en Filipinas
   OpenClaw->>Remifi: handleMessage(text)
   Remifi->>Remifi: parseRemittanceIntent()
   Remifi->>Remifi: resolveCorridor(USD, PH)
@@ -217,26 +219,29 @@ sequenceDiagram
 
 1. Install OpenClaw and run `openclaw onboard`.
 2. Start gateway: `openclaw gateway start`.
-3. Repo `openclaw.json` registers the **remitclaw** skill (Remifi).
-4. Skill doc: `skills/remitclaw/SKILL.md` defines workflow and safety rules.
+3. Repo `openclaw.json` registers the **remifi** skill.
+4. Skill doc: `skills/remifi/SKILL.md` defines workflow and safety rules — agent calls `npm run remifi` for live quotes and sends.
 
 ---
 
 ## 7. Step-by-step transfer pipeline
 
-Every transfer — whether from chat, CLI, or (future) web API — follows the same pipeline.
+Every transfer — whether from chat, CLI, or web API — follows the same pipeline.
 
 ### Step 1 — Parse natural language intent
 
 **Module:** `src/intent/parser.ts` + `src/intent/locales/`
 
-Input example:
+Input examples (locale auto-detected):
 
 ```text
-Send $50 to my mom in the Philippines
+Send $50 to my mom in the Philippines          → en
+Enviar 50 dólares a mi mamá en Filipinas      → es
+Transferir 100 euros para meu irmão na Nigéria todo mês → pt
+Envoyer 50 euros à mon frère au Nigeria       → fr
 ```
 
-Output (`RemittanceIntent`):
+Output (`RemittanceIntent`) for the English example:
 
 ```json
 {
@@ -347,7 +352,7 @@ This prevents accidental large sends and satisfies security requirements in the 
 
 ### Step 7 — Execute on-chain (swap + transfer)
 
-**Module:** `src/agent/remitclaw-agent.ts` (RemifiAgent) → `executeTransfer` (to be fully wired)
+**Module:** `src/agent/remitclaw-agent.ts` (RemifiAgent) → `src/transfers/onchain.ts` (`executeTransfer`)
 
 **Planned execution sequence:**
 
@@ -545,7 +550,7 @@ Sender  →  AGENT_PRIVATE_KEY wallet  →  manual payout later
 ### OpenClaw — agent framework
 
 - **Config:** `openclaw.json`
-- **Skill:** `skills/remitclaw/SKILL.md`
+- **Skill:** `skills/remifi/SKILL.md`
 - Handles: conversation memory, multi-channel input, orchestration
 - Env: `OPENCLAW_GATEWAY_URL`, `CELO_RPC_URL`, `AGENT_PRIVATE_KEY`
 
@@ -568,16 +573,17 @@ Sender  →  AGENT_PRIVATE_KEY wallet  →  manual payout later
 - Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_*_FROM`
 - Triggered after successful transfer in `notifyRecipient()`
 
-### Thirdweb (planned — web auth + wallets)
+### Thirdweb — web auth + wallets
 
-| Feature | UX benefit |
-|---------|------------|
-| Embedded wallet (email login) | No MetaMask required on mobile |
-| Connect wallet | Power users bring Valora / WalletConnect |
-| Smart accounts | Gas sponsorship, batch swap+send |
-| x402 (optional) | Agent payment protocol for hackathon infra track |
+| Feature | Status | UX benefit |
+|---------|--------|------------|
+| Embedded wallet (email login) | ✅ Built (UI) | No MetaMask required on mobile |
+| Connect wallet | ✅ Built (UI) | Power users bring Valora / WalletConnect |
+| User-signed transfers from AI Pay | ⏳ Planned | Non-custodial sends from browser |
+| Smart accounts | ⏳ Planned | Gas sponsorship, batch swap+send |
+| x402 (optional) | ⏳ Planned | Agent payment protocol for hackathon infra track |
 
-**Planned flow:** Onboarding → Thirdweb auth → connected `0x` on Celo → sign transfers from web AI Pay.
+**Today:** Onboarding → Thirdweb auth → connected `0x` on Celo; transfers still sign via agent wallet (`AGENT_PRIVATE_KEY`) until user-signed flow ships.
 
 ### ERC-8004 + 8004scan (hackathon)
 
@@ -594,7 +600,7 @@ Sender  →  AGENT_PRIVATE_KEY wallet  →  manual payout later
 
 ## 11. Security, limits, and confirmations
 
-From `skills/remitclaw/SKILL.md` and `src/config/`:
+From `skills/remifi/SKILL.md` and `src/config/`:
 
 | Rule | Implementation |
 |------|----------------|
@@ -650,7 +656,7 @@ One-time vs recurring is parsed from natural language (`parseFrequency`).
 ```text
 Remifi/
 ├── openclaw.json              # OpenClaw agent + skill config
-├── skills/remitclaw/          # SKILL.md — Remifi agent instructions
+├── skills/remifi/             # SKILL.md — Remifi agent instructions
 ├── data/
 │   ├── corridors.json         # USD→PHP, EUR→NGN, GBP→KES
 │   ├── transactions.json      # Transfer history
@@ -664,12 +670,15 @@ Remifi/
 │   ├── notifications/         # Twilio SMS / WhatsApp
 │   ├── history/               # Transaction store
 │   ├── config/                # Environment (zod)
-│   └── cli/                   # parse-intent, quote, agent
+│   ├── api/                   # HTTP service (quote, transfer, history)
+│   ├── server.ts              # Agent API server (:8787)
+│   └── cli/                   # remifi, send, quote, register, agent
 └── web/                       # Next.js mobile UI
     └── app/
-        ├── components/        # PayChat, AddContact, modals, sheets
-        ├── context/           # Contacts, wallet prefs, add contact
-        └── data/              # Mock people, countries, currencies
+        ├── components/        # PayChat, WalletAssets, AddContact, modals
+        ├── context/           # Contacts, AgentApi, wallet prefs
+        ├── lib/api.ts         # Agent API client
+        └── data/              # Countries, currencies, demo people
 ```
 
 ---
@@ -686,13 +695,14 @@ Remifi/
 | Twilio notification module | ✅ Built (needs Twilio creds) |
 | Recurring schedule storage | ✅ Built |
 | OpenClaw skill + config | ✅ Built |
-| Mobile web UI (onboarding, pay, contacts, wallet) | ✅ Built (demo data) |
+| Mobile web UI (onboarding, pay, contacts, wallet) | ✅ Built |
+| Web ↔ agent API bridge | ✅ Built (`src/server.ts`, `web/app/lib/api.ts`) |
 | On-chain swap + transfer execution | ✅ Built (`src/transfers/onchain.ts`, agent wallet) |
-| Web ↔ agent API bridge | ⏳ Not built |
-| Thirdweb auth + user wallet | ⏳ Planned |
-| Contact wallet address field | ⏳ Planned |
+| OpenClaw remifi skill + unified CLI | ✅ Built (`skills/remifi/`, `npm run remifi`) |
+| Thirdweb auth (web) | ✅ Built (UI); user-signed sends planned |
+| Contact wallet address field (web) | ✅ Built |
 | Claim escrow vault contract (`RemifiVault`) | ⏳ Future (phone-first claim flow) |
-| ERC-8004 agent registration | ⏳ Submission task |
+| ERC-8004 agent registration | ⏳ Submission task (`npm run register`) |
 | Real onchain demo transactions | ⏳ **Required for hackathon win** |
 
 ---
@@ -720,20 +730,26 @@ openclaw onboard
 openclaw gateway start
 ```
 
-### Local demo (web)
+### Local demo (web + agent API)
 
 ```bash
+# Terminal 1 — agent API
+npm run serve
+
+# Terminal 2 — web UI
 cd web
 npm install
+cp .env.example .env.local   # NEXT_PUBLIC_AGENT_API_URL=http://localhost:8787
 npm run dev
-# Open http://localhost:3000 on desktop or network URL on phone
+# Open http://localhost:3000 → AI Pay (/pay)
 ```
 
 ### Hackathon submission checklist
 
 - [ ] Register: quote-tweet @CeloDevs + @Celo with ERC-8004 link
 - [ ] Join Telegram for updates
-- [ ] Wire `executeTransfer` → real Mento swap + ERC-20 transfer on Celo
+- [x] Wire `executeTransfer` → real Mento swap + ERC-20 transfer on Celo
+- [x] Wire web AI Pay → agent API (`/api/intent`, `/api/transfer`)
 - [ ] Generate **real onchain transactions** (Track 2: Most Activity)
 - [ ] Register agent on **ERC-8004** / **8004scan**
 - [ ] Optional: **Self Agent ID** verification
@@ -743,14 +759,14 @@ npm run dev
 
 ### Winning narrative (one paragraph for judges)
 
-Remifi is an onchain remittance agent on Celo. Users speak naturally in four languages; OpenClaw orchestrates the conversation; Mento finds the cheapest stablecoin route; the agent compares fees against Western Union and Wise; the user confirms; a real transaction settles on Celo in seconds; the recipient gets an SMS receipt. Built for Celo's global payments rail and MiniPay-scale distribution — not a prototype chatbot, but an agent with **real economic agency** and **measurable onchain activity**.
+Remifi is a **multilingual** onchain remittance agent on Celo. Users speak naturally in English, Spanish, Portuguese, or French; OpenClaw orchestrates the conversation; Mento finds the cheapest stablecoin route; the agent compares fees against Western Union and Wise; the user confirms; a real transaction settles on Celo in seconds; the recipient gets an SMS receipt. Built for Celo's global payments rail and MiniPay-scale distribution — not a prototype chatbot, but an agent with **real economic agency**, **global language reach**, and **measurable onchain activity**.
 
 ---
 
 ## Quick reference — one transfer in 10 steps
 
-1. User says: *"Send $50 to my mom in the Philippines"*
-2. Parser extracts: `$50`, `USD`, `PH`, recipient `mom`
+1. User says (any of EN / ES / PT / FR): e.g. *"Enviar 50 dólares a mi mamá en Filipinas"*
+2. Parser detects locale (`es`), extracts: `50`, `USD`, `PH`, recipient `mamá`
 3. Corridor resolved: `usd-php` / USDm
 4. Mento quotes output amount and route hops
 5. Fees compared: Mento vs Western Union vs Wise

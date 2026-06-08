@@ -4,6 +4,7 @@ export type Person = {
   avatar: string;
   country?: string;
   phone?: string;
+  walletAddress?: string;
   favourite?: boolean;
 };
 

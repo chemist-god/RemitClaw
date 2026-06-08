@@ -17,6 +17,7 @@ type AddPersonInput = {
   name: string;
   country?: string;
   phone?: string;
+  walletAddress?: string;
   favourite?: boolean;
 };
 
@@ -73,6 +74,7 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
       avatar: toyAvatar(name),
       country: input.country,
       phone: input.phone,
+      walletAddress: input.walletAddress,
       favourite: input.favourite,
     };
     setAdded((prev) => [...prev, person]);

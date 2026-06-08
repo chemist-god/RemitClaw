@@ -31,7 +31,8 @@
           "AGENT_PRIVATE_KEY": "${AGENT_PRIVATE_KEY}",
           "AGENT_ID": "${AGENT_ID}",
           "DEMO_RECIPIENT_ADDRESS": "${DEMO_RECIPIENT_ADDRESS}",
-          "DATA_DIR": "${DATA_DIR}"
+          "DATA_DIR": "${DATA_DIR}",
+          "AGENT_API_PORT": "${AGENT_API_PORT}"
         }
       }
     },

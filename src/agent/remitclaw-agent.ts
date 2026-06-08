@@ -55,12 +55,24 @@ export class RemitClawAgent {
     ].join("\n");
 
     if (needsConfirmation) {
+      const walletHint = this.resolveRecipientWallet(intent)
+        ? `\nRecipient: ${this.truncateAddress(this.resolveRecipientWallet(intent)!)}`
+        : "\nProvide recipient wallet (0x…) or set DEMO_RECIPIENT_ADDRESS before confirming.";
       return {
-        message: `${summary}\n\nConfirm to proceed? (amount exceeds $${this.config.requireConfirmationAboveUsd} threshold)`,
+        message: `${summary}${walletHint}\n\nConfirm to proceed? (amount exceeds $${this.config.requireConfirmationAboveUsd} threshold)`,
         intent,
         needsConfirmation: true,
       };
     }
+
+    const recipient = this.resolveRecipientWallet(intent);
+    if (!recipient) {
+      return {
+        message: `${summary}\n\nCannot execute yet — no recipient wallet. Send the 0x address or set DEMO_RECIPIENT_ADDRESS in .env.`,
+        intent,
+      };
+    }
+    intent.recipientWallet = recipient;
 
     const record = await this.executeTransfer(intent, corridor, quote, comparisons);
     const txLine = record.txHash
@@ -86,6 +98,11 @@ export class RemitClawAgent {
       createdAt: new Date().toISOString(),
       feeComparison,
     };
+
+    if (!intent.recipientWallet) {
+      const fallback = this.resolveRecipientWallet(intent);
+      if (fallback) intent.recipientWallet = fallback;
+    }
 
     if (!intent.recipientWallet) {
       record.status = "failed";
@@ -114,5 +131,14 @@ export class RemitClawAgent {
     saveTransaction(this.config.dataDir, record);
     await notifyRecipient(this.config, intent, record.txHash);
     return record;
+  }
+
+  /** Demo recipient or explicit wallet from the parsed intent. */
+  private resolveRecipientWallet(intent: RemittanceIntent): string | undefined {
+    return intent.recipientWallet || this.config.demoRecipientAddress;
+  }
+
+  private truncateAddress(address: string): string {
+    return `${address.slice(0, 6)}…${address.slice(-4)}`;
   }
 }

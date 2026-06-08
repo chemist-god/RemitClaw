@@ -1,12 +1,9 @@
-import Link from "next/link";
 import { AppHeader } from "../components/AppHeader";
 import { ActionButtons } from "../components/ActionButtons";
-import { Avatar } from "../components/Avatar";
 import { BalanceSection } from "../components/BalanceSection";
 import { PhoneShell } from "../components/PhoneShell";
-import { TokenIcon } from "../components/TokenIcon";
 import { WalletAssets } from "../components/WalletAssets";
-import { findPerson, getAsset, RECENT_TX } from "../data/people";
+import { WalletRecent } from "../components/WalletRecent";
 
 export default function WalletScreen() {
   return (
@@ -15,48 +12,8 @@ export default function WalletScreen() {
         <AppHeader />
         <BalanceSection />
         <ActionButtons />
-
         <WalletAssets />
-
-        <section className="mt-7">
-          <h2 className="text-[1.05rem] text-ink">Recent</h2>
-          <div className="mt-3 flex flex-col gap-2">
-            {RECENT_TX.map((tx) => {
-              const person = findPerson(tx.to);
-              const asset = getAsset(tx.currency);
-              return (
-                <Link key={tx.id} href={`/pay?to=${tx.to}&amount=${tx.amount}`} className="tx-row">
-                  {person ? (
-                    <Avatar name={person.name} src={person.avatar} size={40} />
-                  ) : (
-                    <div className="tx-icon">↑</div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-ink">Sent to {tx.to}</p>
-                    <p className="text-xs text-muted">{tx.date}</p>
-                  </div>
-                  <div className="flex items-center gap-2 text-right">
-                    <div>
-                      <p className="tnum font-bold text-ink">
-                        -{tx.amount} {tx.currency}
-                      </p>
-                      <p
-                        className={`text-xs font-semibold capitalize ${
-                          tx.status === "confirmed"
-                            ? "text-accent-600"
-                            : "text-brand-500"
-                        }`}
-                      >
-                        {tx.status}
-                      </p>
-                    </div>
-                    {asset && <TokenIcon src={asset.logo} alt={asset.symbol} size={28} />}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+        <WalletRecent />
       </div>
     </PhoneShell>
   );

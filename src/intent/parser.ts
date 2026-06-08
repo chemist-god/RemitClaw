@@ -38,6 +38,11 @@ function parseFrequency(message: string, locale: SupportedLocale): RemittanceInt
   return "once";
 }
 
+function parseRecipientWallet(message: string): string | undefined {
+  const match = message.match(/0x[a-fA-F0-9]{40}/);
+  return match?.[0];
+}
+
 function parseRecipientName(message: string): string | undefined {
   const patterns = [
     /(?:to|para|à|pour)\s+(?:my\s+)?(\w+)/i,
@@ -71,6 +76,7 @@ export function parseRemittanceIntent(
     sourceCurrency: parseSourceCurrency(message),
     destinationCountry,
     recipientName: parseRecipientName(message),
+    recipientWallet: parseRecipientWallet(message),
     frequency: parseFrequency(message, locale),
     rawMessage: message,
   });

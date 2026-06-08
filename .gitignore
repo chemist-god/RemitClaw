@@ -9,3 +9,10 @@ coverage/
 .vitest/
 *.tsbuildinfo
 .openclaw/
+
+# Foundry build artifacts
+contract/cache/
+contract/out/
+
+# taking way the how it works md file 
+.howitworks.md\\
