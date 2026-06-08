@@ -2,13 +2,16 @@ import type { NextConfig } from "next";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const webDir = path.dirname(fileURLToPath(import.meta.url));
-const monorepoRoot = path.resolve(webDir, "..");
+const monorepoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  ".."
+);
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
+  // Must match outputFileTracingRoot (required for Vercel monorepo builds).
   turbopack: {
-    root: webDir,
+    root: monorepoRoot,
   },
   poweredByHeader: false,
   images: {
