@@ -5,8 +5,6 @@ A **multilingual** AI remittance agent on Celo — speak in English, Spanish, Po
 > *"Send $50 to my mom in the Philippines"* · *"Enviar 50 dólares a mi mamá en Filipinas"* · *"Transferir 100 euros para meu irmão na Nigéria"* · *"Envoyer 50 euros à mon frère au Nigeria"*  
 > → auto-detected locale, Mento route, fee comparison vs Western Union & Wise, on-chain swap + transfer.
 
-**Full guide:** [howitworks.md](./howitworks.md) — product flows, architecture, on-chain models, hackathon checklist.
-
 ---
 
 ## What it does
@@ -54,7 +52,6 @@ A **multilingual** AI remittance agent on Celo — speak in English, Spanish, Po
 Remifi/
 ├── openclaw.json           # OpenClaw agent + remifi skill
 ├── skills/remifi/          # SKILL.md — agent instructions for OpenClaw
-├── howitworks.md           # Full product & architecture guide
 ├── data/
 │   ├── corridors.json      # USD→PHP, EUR→NGN, GBP→KES (+ Mento token addresses)
 │   ├── transactions.json   # Transfer history
@@ -178,8 +175,6 @@ Remifi parses remittance intent in four languages. Users can type or speak natur
 
 Each locale understands local country names (e.g. *Filipinas*, *Nigéria*, *Brésil*), currency formats (`$50`, `50 euros`, `R$100`), and recurring phrases (*cada mes*, *todo mês*, *chaque mois*).
 
-Details: [howitworks.md §12](./howitworks.md#12-multi-language-support).
-
 ---
 
 ## Integrations
@@ -243,8 +238,6 @@ npm run typecheck    # Type-check
 | Contact wallet field (web) | ✅ |
 | Claim escrow vault (phone-only recipients) | ⏳ |
 | ERC-8004 registration on 8004scan | ⏳ submission |
-
-Details: [howitworks.md §15](./howitworks.md#15-what-is-built-today-vs-roadmap).
 
 ---
 
