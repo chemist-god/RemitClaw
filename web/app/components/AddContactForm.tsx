@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { getCountryLabel, phonePlaceholder } from "../data/countries";
 import { useContacts } from "../context/ContactsContext";
+import { useLanguage } from "../context/LanguageContext";
+import { canPickPhoneContacts, pickPhoneContact } from "../lib/phone-contacts";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { CountryPickerField } from "./CountryPickerSheet";
 import { Avatar } from "./Avatar";
@@ -13,6 +15,7 @@ type AddContactFormProps = {
 
 export function AddContactForm({ onSaved }: AddContactFormProps) {
   const { addPerson } = useContacts();
+  const { t } = useLanguage();
 
   const [name, setName] = useState("");
   const [country, setCountry] = useState("PH");
@@ -21,8 +24,10 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
   const [favourite, setFavourite] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPhase, setConfirmPhase] = useState<"confirm" | "success">("confirm");
+  const [picking, setPicking] = useState(false);
+  const phonePickerAvailable = canPickPhoneContacts();
 
-  const previewName = name.trim() || "Contact";
+  const previewName = name.trim() || t("contact.contact");
   const countryLabel = getCountryLabel(country);
 
   const modalDetails = useMemo(
@@ -50,9 +55,22 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
       name: name.trim(),
       country,
       phone: phone.trim() || undefined,
+      walletAddress: walletAddress.trim() || undefined,
       favourite,
     });
     setConfirmPhase("success");
+  };
+
+  const handlePickFromPhone = async () => {
+    setPicking(true);
+    try {
+      const picked = await pickPhoneContact();
+      if (!picked) return;
+      if (picked.name) setName(picked.name);
+      if (picked.phone) setPhone(picked.phone);
+    } finally {
+      setPicking(false);
+    }
   };
 
   const handleCloseConfirm = () => {
@@ -69,19 +87,19 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
       <form onSubmit={handleSubmit} className="flex flex-col">
         <div className="flex flex-col items-center pt-1">
           <Avatar name={previewName} ring size={72} />
-          <p className="mt-3 text-sm text-muted">They&apos;ll appear on your home screen</p>
+          <p className="mt-3 text-sm text-muted">{t("contact.appearsHome")}</p>
         </div>
 
         <section className="mt-6">
           <label htmlFor="add-contact-name" className="form-label">
-            Full name
+            {t("contact.fullName")}
           </label>
           <input
             id="add-contact-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Mom, Carlos, Aisha"
+            placeholder={t("contact.namePlaceholder")}
             className="form-field mt-2 w-full"
             autoComplete="name"
             required
@@ -94,14 +112,15 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
 
         <section className="mt-5">
           <label htmlFor="add-contact-wallet" className="form-label">
-            Celo wallet <span className="font-normal text-soft">(optional)</span>
+            {t("contact.wallet")}{" "}
+            <span className="font-normal text-soft">{t("contact.walletOptional")}</span>
           </label>
           <input
             id="add-contact-wallet"
             type="text"
             value={walletAddress}
             onChange={(e) => setWalletAddress(e.target.value)}
-            placeholder="0x… for direct on-chain delivery"
+            placeholder={t("contact.walletPlaceholder")}
             className="form-field mt-2 w-full font-mono text-sm"
             autoComplete="off"
             spellCheck={false}
@@ -109,9 +128,22 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
         </section>
 
         <section className="mt-5">
-          <label htmlFor="add-contact-phone" className="form-label">
-            Phone <span className="font-normal text-soft">(optional)</span>
-          </label>
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="add-contact-phone" className="form-label">
+              {t("contact.phone")}{" "}
+              <span className="font-normal text-soft">{t("contact.walletOptional")}</span>
+            </label>
+            {phonePickerAvailable ? (
+              <button
+                type="button"
+                className="text-xs font-semibold text-brand-700 underline underline-offset-2"
+                onClick={() => void handlePickFromPhone()}
+                disabled={picking}
+              >
+                {picking ? t("people.opening") : t("people.fromPhone")}
+              </button>
+            ) : null}
+          </div>
           <input
             id="add-contact-phone"
             type="tel"
@@ -121,6 +153,11 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
             className="form-field mt-2 w-full"
             autoComplete="tel"
           />
+          {!phonePickerAvailable ? (
+            <p className="mt-1.5 text-xs text-soft">
+              {t("people.phoneHint")}
+            </p>
+          ) : null}
         </section>
 
         <label className="method-row mt-5 cursor-pointer">
@@ -130,7 +167,7 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
             onChange={(e) => setFavourite(e.target.checked)}
             className="accent-brand-500"
           />
-          <span className="font-semibold text-ink">Add to favourites</span>
+          <span className="font-semibold text-ink">{t("contact.favourite")}</span>
         </label>
 
         <button
@@ -138,7 +175,7 @@ export function AddContactForm({ onSaved }: AddContactFormProps) {
           className="btn btn-gradient btn-block mt-6"
           disabled={!name.trim()}
         >
-          Save contact
+          {t("contact.save")}
         </button>
       </form>
 

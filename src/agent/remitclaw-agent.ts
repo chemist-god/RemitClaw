@@ -6,22 +6,41 @@ import { compareFees, formatSavings } from "../fees/comparison.js";
 import { prepareTransfer } from "../transfers/executor.js";
 import { scheduleRecurringTransfer } from "../transfers/scheduler.js";
 import { saveTransaction } from "../history/store.js";
-import { notifyRecipient } from "../notifications/twilio.js";
+import { notifyRecipient, notifyClaimLink } from "../notifications/twilio.js";
 import { executeRemittance } from "../transfers/onchain.js";
 import { formatUnits } from "viem";
+import { resolveContactContext } from "../contacts/resolve.js";
+import { executeEscrowRemittance, vaultConfigured } from "../escrow/client.js";
 
 export interface AgentResponse {
   message: string;
   intent?: RemittanceIntent;
   record?: TransferRecord;
   needsConfirmation?: boolean;
+  claimUrl?: string;
 }
 
 export class RemitClawAgent {
   constructor(private readonly config: Config) {}
 
-  async handleMessage(userMessage: string): Promise<AgentResponse> {
+  private enrichIntent(userMessage: string): RemittanceIntent {
     const intent = parseRemittanceIntent(userMessage);
+    const contactCtx = resolveContactContext(
+      this.config.dataDir,
+      intent.recipientName
+    );
+    if (!contactCtx) return intent;
+    return {
+      ...intent,
+      destinationCountry:
+        contactCtx.destinationCountry ?? intent.destinationCountry,
+      recipientWallet: contactCtx.recipientWallet ?? intent.recipientWallet,
+      recipientPhone: contactCtx.recipientPhone ?? intent.recipientPhone,
+    };
+  }
+
+  async handleMessage(userMessage: string): Promise<AgentResponse> {
+    const intent = this.enrichIntent(userMessage);
 
     if (intent.frequency !== "once") {
       const schedule = scheduleRecurringTransfer(this.config.dataDir, intent);
@@ -46,42 +65,48 @@ export class RemitClawAgent {
     );
     const savings = formatSavings(comparisons);
 
+    const phoneOnly =
+      !intent.recipientWallet &&
+      Boolean(intent.recipientPhone) &&
+      vaultConfigured(this.config);
+
     const summary = [
       `Route: ${corridor.mentoPair} (${quote.routeHops} hop${quote.routeHops === 1 ? "" : "s"})`,
       `Send: ${intent.amount} ${intent.sourceCurrency}`,
       `Recipient receives: ~${recipientReceives.toFixed(2)} ${corridor.destinationCurrency}`,
       `Mento fee: ~$${quote.mentoFeeUsd.toFixed(2)} | Gas: ~$${quote.estimatedGasUsd.toFixed(4)}`,
+      phoneOnly
+        ? "Delivery: claim link via SMS/WhatsApp"
+        : intent.recipientWallet
+          ? `Recipient: ${this.truncateAddress(intent.recipientWallet)}`
+          : "Delivery: add wallet or phone on contact",
       savings,
     ].join("\n");
 
     if (needsConfirmation) {
-      const walletHint = this.resolveRecipientWallet(intent)
-        ? `\nRecipient: ${this.truncateAddress(this.resolveRecipientWallet(intent)!)}`
-        : "\nProvide recipient wallet (0x…) or set DEMO_RECIPIENT_ADDRESS before confirming.";
       return {
-        message: `${summary}${walletHint}\n\nConfirm to proceed? (amount exceeds $${this.config.requireConfirmationAboveUsd} threshold)`,
+        message: `${summary}\n\nConfirm to proceed? (amount exceeds $${this.config.requireConfirmationAboveUsd} threshold)`,
         intent,
         needsConfirmation: true,
       };
     }
 
-    const recipient = this.resolveRecipientWallet(intent);
-    if (!recipient) {
-      return {
-        message: `${summary}\n\nCannot execute yet — no recipient wallet. Send the 0x address or set DEMO_RECIPIENT_ADDRESS in .env.`,
-        intent,
-      };
+    if (!intent.recipientWallet && !phoneOnly) {
+      const hint = intent.recipientPhone
+        ? "\n\nPhone on file but REMIFI_VAULT_ADDRESS is not set — deploy the vault or add a wallet."
+        : "\n\nCannot execute — save a contact with a phone or wallet, or set DEMO_RECIPIENT_ADDRESS.";
+      return { message: `${summary}${hint}`, intent };
     }
-    intent.recipientWallet = recipient;
 
     const record = await this.executeTransfer(intent, corridor, quote, comparisons);
-    const txLine = record.txHash
-      ? `\nTx: ${record.txHash}`
-      : "";
+    const txLine = record.txHash ? `\nTx: ${record.txHash}` : "";
+    const claimLine = record.claimUrl ? `\nClaim link sent: ${record.claimUrl}` : "";
+
     return {
-      message: `${summary}\n\nTransfer ${record.status}. Receipt ID: ${record.id}${txLine}`,
+      message: `${summary}\n\nTransfer ${record.status}. Receipt ID: ${record.id}${txLine}${claimLine}`,
       intent,
       record,
+      claimUrl: record.claimUrl,
     };
   }
 
@@ -99,6 +124,42 @@ export class RemitClawAgent {
       feeComparison,
     };
 
+    const phoneOnly =
+      !intent.recipientWallet &&
+      Boolean(intent.recipientPhone) &&
+      vaultConfigured(this.config);
+
+    if (phoneOnly && intent.recipientPhone) {
+      try {
+        const escrow = await executeEscrowRemittance(
+          this.config,
+          corridor,
+          quote,
+          intent.recipientPhone
+        );
+        record.txHash = escrow.txHash;
+        record.status = "confirmed";
+        record.confirmedAt = new Date().toISOString();
+        record.deliveryMethod = "escrow";
+        record.claimId = escrow.claim.claimId;
+        record.claimUrl = escrow.claim.claimUrl;
+
+        saveTransaction(this.config.dataDir, record);
+        await notifyClaimLink(
+          this.config,
+          intent,
+          escrow.claim.claimUrl,
+          Number(formatUnits(escrow.amount, 18)),
+          corridor.destinationCurrency
+        );
+        return record;
+      } catch (err) {
+        record.status = "failed";
+        saveTransaction(this.config.dataDir, record);
+        throw err;
+      }
+    }
+
     if (!intent.recipientWallet) {
       const fallback = this.resolveRecipientWallet(intent);
       if (fallback) intent.recipientWallet = fallback;
@@ -108,7 +169,7 @@ export class RemitClawAgent {
       record.status = "failed";
       saveTransaction(this.config.dataDir, record);
       throw new Error(
-        "No recipient wallet address. Add the recipient's 0x address (or use the claim flow) before sending."
+        "No recipient wallet address. Add the recipient's 0x address, phone for claim escrow, or set DEMO_RECIPIENT_ADDRESS."
       );
     }
 
@@ -122,6 +183,7 @@ export class RemitClawAgent {
       record.txHash = result.txHash;
       record.status = "confirmed";
       record.confirmedAt = new Date().toISOString();
+      record.deliveryMethod = "wallet";
     } catch (err) {
       record.status = "failed";
       saveTransaction(this.config.dataDir, record);

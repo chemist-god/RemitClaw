@@ -10,9 +10,11 @@ import { ASSISTANT, PROFILE } from "../data/people";
 import { BoltIcon, ChevronLeftIcon, MicIcon } from "./icons";
 import { useAgentApi } from "../context/AgentApiContext";
 import { useContacts } from "../context/ContactsContext";
+import { useLanguage } from "../context/LanguageContext";
 import {
   contactTransferContext,
   enrichMessageWithContact,
+  extractRecipientName,
   matchContact,
 } from "../lib/contacts";
 import {
@@ -38,22 +40,6 @@ type Message =
     }
   | { id: string; role: "user"; text: string };
 
-const QUICK_REPLIES = [
-  { label: "Send $50 to Mom" },
-  { label: "Enviar 50 dólares a Mamá" },
-  { label: "Send 100 USDm to Dad" },
-];
-
-function introMessages(): Message[] {
-  return [
-    {
-      id: "intro",
-      role: "bot",
-      text: `Hi! I'm your Remifi payment assistant — powered by the agent API. Tell me who to pay and how much in English, Spanish, Portuguese, or French — e.g. "Send $50 to Mom" or "Enviar 50 dólares a Mamá". I'll fetch a live Mento quote, then you confirm to send on Celo.`,
-    },
-  ];
-}
-
 type PendingPayment = {
   message: string;
   recipientName: string;
@@ -62,7 +48,11 @@ type PendingPayment = {
   ctx?: TransferContext;
 };
 
-function quoteDetails(quote: QuoteResponse, ctx?: TransferContext): ConfirmationDetail[] {
+function quoteDetails(
+  quote: QuoteResponse,
+  ctx: TransferContext | undefined,
+  t: (key: string) => string
+): ConfirmationDetail[] {
   const { intent } = quote;
   const rows: ConfirmationDetail[] = [
     { label: "To", value: intent.recipientName ?? "Recipient" },
@@ -94,6 +84,10 @@ function quoteDetails(quote: QuoteResponse, ctx?: TransferContext): Confirmation
     });
   } else if (ctx?.recipientPhone) {
     rows.push({ label: "Phone", value: ctx.recipientPhone });
+    rows.push({ label: "Delivery", value: t("pay.deliveryClaim") });
+  }
+  if (quote.deliveryMethod === "escrow") {
+    rows.push({ label: "Method", value: t("pay.methodEscrow") });
   }
   return rows;
 }
@@ -104,6 +98,16 @@ export function PayChat() {
   const presetAmount = searchParams.get("amount");
   const { allPeople } = useContacts();
   const { refreshBalances } = useAgentApi();
+  const { t, locale } = useLanguage();
+
+  const quickReplies = useMemo(
+    () => [
+      { label: t("pay.quick1") },
+      { label: t("pay.quick2") },
+      { label: t("pay.quick3") },
+    ],
+    [t, locale]
+  );
 
   const [input, setInput] = useState(
     presetTo && presetAmount
@@ -112,7 +116,7 @@ export function PayChat() {
         ? `Send $50 to ${presetTo}`
         : ""
   );
-  const [messages, setMessages] = useState<Message[]>(introMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const presetSent = useRef(false);
   const [thinking, setThinking] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -121,6 +125,10 @@ export function PayChat() {
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(
     null
   );
+
+  useEffect(() => {
+    setMessages([{ id: "intro", role: "bot", text: t("pay.intro") }]);
+  }, [locale, t]);
 
   const appendBot = (msg: Omit<Extract<Message, { role: "bot" }>, "id" | "role">) =>
     setMessages((prev) => [
@@ -133,9 +141,7 @@ export function PayChat() {
       const preset = matchContact(presetTo, allPeople);
       if (preset) return preset;
     }
-    const tail = text.match(/\bto\s+(.+)$/i)?.[1];
-    if (!tail) return undefined;
-    const name = tail.replace(/\s+in\s+.+$/i, "").trim();
+    const name = extractRecipientName(text);
     return matchContact(name, allPeople);
   };
 
@@ -167,11 +173,11 @@ export function PayChat() {
 
       let extra = "";
       if (!ctx?.recipientWallet && !ctx?.recipientPhone) {
-        extra =
-          "\n\nAdd a wallet or phone on the contact for delivery. Sends use DEMO_RECIPIENT_ADDRESS until then.";
-      } else if (!ctx?.recipientWallet && ctx?.recipientPhone) {
-        extra =
-          "\n\nPhone on file — claim escrow not live yet; set a wallet on the contact or DEMO_RECIPIENT_ADDRESS for on-chain send.";
+        extra = `\n\n${t("pay.addContactHint")}`;
+      } else if (quote.deliveryMethod === "escrow") {
+        extra = `\n\n${t("pay.escrowHint")}`;
+      } else if (ctx?.recipientPhone && !ctx?.recipientWallet) {
+        extra = `\n\n${t("pay.vaultHint")}`;
       }
 
       appendBot({
@@ -186,7 +192,7 @@ export function PayChat() {
     } catch (err) {
       const reason = err instanceof Error ? err.message : "Something went wrong";
       appendBot({
-        text: `I couldn't put together that transfer. ${reason}. Is the agent API running? (npm run serve)`,
+        text: `${t("pay.errorPrefix")} ${reason}. ${t("pay.errorSuffix")}`,
       });
     } finally {
       setThinking(false);
@@ -201,8 +207,6 @@ export function PayChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetTo, presetAmount]);
 
-  const quickReplies = useMemo(() => QUICK_REPLIES, []);
-
   const openPaymentModal = (confirm: {
     message: string;
     quote: QuoteResponse;
@@ -212,7 +216,7 @@ export function PayChat() {
       message: confirm.message,
       recipientName: confirm.quote.intent.recipientName ?? "your recipient",
       quote: confirm.quote,
-      details: quoteDetails(confirm.quote, confirm.ctx),
+      details: quoteDetails(confirm.quote, confirm.ctx, t),
       ctx: confirm.ctx,
     });
     setModalPhase("confirm");
@@ -229,16 +233,22 @@ export function PayChat() {
       );
       setModalPhase("success");
       await refreshBalances();
+      const claimNote =
+        result.deliveryMethod === "escrow" && result.claimUrl
+          ? `\n${t("pay.claimLink")}${result.notificationSent ? ` ${t("pay.claimSent")}` : ""}: ${result.claimUrl}`
+          : "";
+
       appendBot({
         text:
-          `Done! ${result.summary}. ${result.savings}` +
-          (result.txHash ? `\nReceipt: ${result.receiptId}` : ""),
+          `${t("pay.done")} ${result.summary}. ${result.savings}` +
+          (result.txHash ? `\nReceipt: ${result.receiptId}` : "") +
+          claimNote,
         txHash: result.txHash,
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : "Transfer failed";
       setModalOpen(false);
-      appendBot({ text: `The transfer didn't go through. ${reason}` });
+      appendBot({ text: `${t("pay.transferFailed")} ${reason}` });
     } finally {
       setSubmitting(false);
     }
@@ -254,10 +264,12 @@ export function PayChat() {
   return (
     <>
       <header className="flex shrink-0 items-center px-5 pb-3 pt-5">
-        <Link href="/home" className="icon-btn" aria-label="Back">
+        <Link href="/home" className="icon-btn" aria-label={t("common.back")}>
           <ChevronLeftIcon className="h-5 w-5" />
         </Link>
-        <h1 className="flex-1 text-center text-[1.05rem] font-bold">AI Pay</h1>
+        <h1 className="flex-1 text-center text-[1.05rem] font-bold">
+          {t("pay.title")}
+        </h1>
         <span className="w-10" />
       </header>
 
@@ -296,7 +308,7 @@ export function PayChat() {
           ) : (
             <div key={msg.id} className="flex flex-col items-end gap-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-soft">You</span>
+                <span className="text-xs font-bold text-soft">{t("pay.you")}</span>
                 <Avatar name={PROFILE.name} src={PROFILE.avatar} size={26} ring />
               </div>
               <div className="bubble bubble-user">{msg.text}</div>
@@ -309,7 +321,7 @@ export function PayChat() {
               <Avatar name={ASSISTANT.name} src={ASSISTANT.avatar} size={26} ring />
               <span className="text-xs font-bold text-brand-700">{ASSISTANT.name}</span>
             </div>
-            <div className="bubble bubble-bot text-soft">Getting a live Mento quote…</div>
+            <div className="bubble bubble-bot text-soft">{t("pay.thinking")}</div>
           </div>
         )}
       </div>
@@ -339,14 +351,14 @@ export function PayChat() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type or use voice"
+            placeholder={t("pay.placeholder")}
             className="min-w-0 flex-1 bg-transparent text-[0.9rem] text-ink outline-none placeholder:text-soft"
           />
           <button type="button" className="icon-btn shrink-0" aria-label="Voice input">
             <MicIcon className="h-[1.15rem] w-[1.15rem]" />
           </button>
           <button type="submit" className="btn btn-dark shrink-0 px-5" disabled={thinking}>
-            Pay
+            {t("pay.payButton")}
           </button>
         </form>
       </div>
@@ -358,12 +370,12 @@ export function PayChat() {
         recipientName={pendingPayment?.recipientName}
         message={
           modalPhase === "success"
-            ? "Your transfer is confirmed on Celo via the agent API."
+            ? t("pay.confirmSuccess")
             : pendingPayment?.quote.savings
         }
         details={pendingPayment?.details}
         busy={submitting}
-        busyLabel="Sending on-chain…"
+        busyLabel={t("pay.sending")}
         onConfirm={handleConfirmPayment}
         onClose={handleClosePaymentModal}
       />

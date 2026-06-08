@@ -247,6 +247,13 @@
   .chip:active {
     background: var(--color-brand-100);
   }
+  .chip-active {
+    background: var(--color-brand-500);
+    color: #fff;
+  }
+  .chip-active:active {
+    background: var(--color-brand-600);
+  }
 }
 
 /* ============================================================
@@ -320,6 +327,30 @@
     transition: background 0.15s var(--ease-out-soft);
   }
   .icon-btn:active {
+    background: var(--color-surface-subtle);
+  }
+
+  .lang-picker-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    padding: 0 0.45rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    color: var(--color-ink);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s var(--ease-out-soft);
+  }
+
+  .lang-picker-btn:active {
     background: var(--color-surface-subtle);
   }
 }

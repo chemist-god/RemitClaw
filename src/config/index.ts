@@ -28,6 +28,11 @@ const ConfigSchema = z
     .string()
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .optional(),
+  /** Deployed RemifiVault for phone-only claim escrow. */
+  remifiVaultAddress: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
 
   // ── ERC-8004 agent identity ──
   identityRegistryAddress: z
@@ -96,6 +101,7 @@ export function loadConfig(): Config {
     agentApiKey: process.env.AGENT_API_KEY,
     webOrigin: process.env.WEB_ORIGIN,
     demoRecipientAddress: process.env.DEMO_RECIPIENT_ADDRESS,
+    remifiVaultAddress: process.env.REMIFI_VAULT_ADDRESS,
 
     identityRegistryAddress: process.env.IDENTITY_REGISTRY_ADDRESS,
     reputationRegistryAddress: process.env.REPUTATION_REGISTRY_ADDRESS,

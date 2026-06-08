@@ -1,10 +1,16 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const webDir = path.dirname(fileURLToPath(import.meta.url));
+const monorepoRoot = path.resolve(webDir, "..");
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: monorepoRoot,
   turbopack: {
-    root: path.resolve(process.cwd()),
+    root: webDir,
   },
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       {
@@ -13,6 +19,18 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+    minimumCacheTTL: 60 * 60 * 24 * 7,
+  },
+  experimental: {
+    optimizePackageImports: [
+      "thirdweb",
+      "thirdweb/react",
+      "thirdweb/wallets",
+      "thirdweb/extensions",
+      "thirdweb/chains",
+    ],
+    // Safe with turbopack.root = webDir; use `npm run dev:clean` if cache corrupts.
+    turbopackFileSystemCacheForDev: true,
   },
 };
 

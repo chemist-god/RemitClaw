@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useId, useRef, useState } from "react";
+import { useLanguage } from "../context/LanguageContext";
 import { AddContactForm } from "./AddContactForm";
 
 type AddContactSheetProps = {
@@ -27,6 +28,7 @@ function lockBodyScroll() {
 }
 
 export function AddContactSheet({ onClose }: AddContactSheetProps) {
+  const { t } = useLanguage();
   const titleId = useId();
   const [formKey, setFormKey] = useState(0);
   const closeRef = useRef(onClose);
@@ -72,9 +74,9 @@ export function AddContactSheet({ onClose }: AddContactSheetProps) {
         <div className="sheet-header sheet-header-row">
           <div className="min-w-0">
             <h2 id={titleId} className="text-[1.15rem] font-bold text-ink">
-              Add contact
+              {t("contact.addTitle")}
             </h2>
-            <p className="mt-0.5 text-sm text-muted">Save someone you send to often</p>
+            <p className="mt-0.5 text-sm text-muted">{t("contact.addSubtitle")}</p>
           </div>
           <button
             type="button"

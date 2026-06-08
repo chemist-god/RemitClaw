@@ -28,6 +28,8 @@ export type QuoteResponse = {
   routeHops?: number;
   mentoPair?: string;
   scheduleNextRunAt?: string;
+  deliveryMethod?: "wallet" | "escrow";
+  matchedContact?: string;
 };
 
 export type TransferResponse = {
@@ -38,6 +40,40 @@ export type TransferResponse = {
   destinationCurrency: string;
   summary: string;
   savings: string;
+  deliveryMethod?: "wallet" | "escrow";
+  claimUrl?: string;
+  notificationSent?: boolean;
+};
+
+export type StoredContact = {
+  id: string;
+  name: string;
+  country?: string;
+  phone?: string;
+  walletAddress?: string;
+  favourite?: boolean;
+  source?: "phone" | "manual" | "seed";
+  updatedAt?: string;
+};
+
+export type PhoneImportEntry = {
+  name: string;
+  phone: string;
+};
+
+export type ContactsResponse = {
+  contacts: StoredContact[];
+};
+
+export type ClaimInfoResponse = {
+  claimId: string;
+  vaultAddress: string | null;
+  depositor: string;
+  token: string;
+  amount: string;
+  amountFormatted: string;
+  expiry: string;
+  status: number;
 };
 
 export type BalanceItem = {
@@ -62,6 +98,8 @@ export type HealthResponse = {
   ok: boolean;
   chainId: number;
   executionReady: boolean;
+  vaultConfigured?: boolean;
+  contactsCount?: number;
 };
 
 export type HistoryItem = {
@@ -149,6 +187,47 @@ export async function fetchBalances(address: string): Promise<BalanceResponse> {
 export async function fetchHistory(): Promise<HistoryResponse> {
   const res = await fetch(`${API_BASE}/api/history`, { headers: headers() });
   return handle<HistoryResponse>(res);
+}
+
+/** Sync contacts to the agent API so Telegram/WhatsApp/CLI can resolve names. */
+export async function syncContacts(
+  contacts: StoredContact[]
+): Promise<ContactsResponse> {
+  const res = await fetch(`${API_BASE}/api/contacts/sync`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ contacts }),
+  });
+  return handle<ContactsResponse>(res);
+}
+
+/** Fetch contacts stored on the agent API. */
+export async function fetchContacts(): Promise<ContactsResponse> {
+  const res = await fetch(`${API_BASE}/api/contacts`, { headers: headers() });
+  return handle<ContactsResponse>(res);
+}
+
+/** Bulk import device address-book entries into the agent contact store. */
+export async function importPhoneContacts(
+  contacts: PhoneImportEntry[]
+): Promise<ContactsResponse & { imported: number }> {
+  const res = await fetch(`${API_BASE}/api/contacts/import-phone`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ contacts }),
+  });
+  return handle<ContactsResponse & { imported: number }>(res);
+}
+
+/** Read escrow details for a claim link (public). */
+export async function fetchClaimInfo(
+  claimId: string
+): Promise<ClaimInfoResponse> {
+  const res = await fetch(
+    `${API_BASE}/api/claim?claimId=${encodeURIComponent(claimId)}`,
+    { headers: headers() }
+  );
+  return handle<ClaimInfoResponse>(res);
 }
 
 /** Celo explorer tx link (mainnet by default; Sepolia uses celo-sepolia subdomain). */

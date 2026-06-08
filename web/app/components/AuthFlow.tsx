@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ConnectWallet } from "./ConnectWallet";
+import { LanguageSelector } from "./LanguageSelector";
 import { useWallet, shortAddress } from "../context/WalletContext";
+import { useLanguage } from "../context/LanguageContext";
 
 export function AuthFlow() {
   const router = useRouter();
   const { address, isConnected } = useWallet();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!isConnected) return;
@@ -20,6 +23,10 @@ export function AuthFlow() {
   return (
     <div className="phone">
       <div className="screen px-7 pb-8 pt-6">
+        <div className="flex justify-end">
+          <LanguageSelector variant="compact" />
+        </div>
+
         <div className="relative mt-2 flex flex-1 items-center justify-center">
           <div className="bg-hero-glow absolute inset-x-0 top-6 mx-auto h-64 w-64 rounded-full blur-2xl" />
           <Image
@@ -28,19 +35,21 @@ export function AuthFlow() {
             width={520}
             height={360}
             priority
+            loading="eager"
+            fetchPriority="high"
+            sizes="(max-width: 440px) 78vw, 300px"
             className="animate-coin-bob relative w-[78%] max-w-[300px] drop-shadow-2xl"
           />
         </div>
 
         <div className="animate-float-in mt-2 text-center">
           <h1 className="text-[2.2rem] leading-[1.1] text-ink">
-            Create your
+            {t("auth.title1")}
             <br />
-            Celo wallet.
+            {t("auth.title2")}
           </h1>
           <p className="mx-auto mt-4 max-w-[19rem] text-[0.95rem] leading-6 text-muted">
-            Sign in with email or a social account to spin up a secure wallet —
-            no seed phrase needed. Already have one? Connect it instead.
+            {t("auth.subtitle")}
           </p>
         </div>
 
@@ -48,19 +57,19 @@ export function AuthFlow() {
           {isConnected ? (
             <div className="w-full rounded-[var(--radius-lg)] border border-accent-200 bg-accent-50 p-4 text-center">
               <p className="text-sm font-semibold text-accent-700">
-                Wallet connected
+                {t("auth.connected")}
               </p>
               <p className="tnum mt-1 text-sm text-muted">
                 {shortAddress(address)}
               </p>
-              <p className="mt-2 text-xs text-soft">Taking you home…</p>
+              <p className="mt-2 text-xs text-soft">{t("auth.takingHome")}</p>
             </div>
           ) : (
-            <ConnectWallet label="Continue with email or wallet" />
+            <ConnectWallet label={t("auth.continue")} />
           )}
 
           <Link href="/home" className="text-sm font-semibold text-muted">
-            Skip for now
+            {t("auth.skip")}
           </Link>
         </div>
       </div>

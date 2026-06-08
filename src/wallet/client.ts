@@ -84,3 +84,24 @@ export async function transferToken(
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;
 }
+
+/** Approve a spender to pull ERC-20 tokens from the agent wallet. */
+export async function approveToken(
+  config: Config,
+  token: Address,
+  spender: Address,
+  amount: bigint
+): Promise<Hex> {
+  const wallet = getWalletClient(config);
+  const publicClient = getPublicClient(config);
+
+  const hash = await wallet.writeContract({
+    address: token,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [spender, amount],
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash });
+  return hash;
+}

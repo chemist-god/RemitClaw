@@ -6,6 +6,7 @@ export type Person = {
   phone?: string;
   walletAddress?: string;
   favourite?: boolean;
+  source?: "phone" | "manual" | "seed";
 };
 
 /** Illustrated toy-style avatar (DiceBear adventurer) */

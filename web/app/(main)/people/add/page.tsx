@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useAddContact } from "../../context/AddContactContext";
-import { AppHeader } from "../../components/AppHeader";
-import { PeopleList } from "../../components/PeopleList";
-import { PhoneShell } from "../../components/PhoneShell";
+import { useAddContact } from "../../../context/AddContactContext";
+import { AppHeader } from "../../../components/AppHeader";
+import { PeopleList } from "../../../components/PeopleList";
+import { PhoneShell } from "../../../components/PhoneShell";
 
 export default function AddPersonRedirect() {
   const router = useRouter();

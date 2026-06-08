@@ -12,44 +12,27 @@ import {
 import {
   fetchAgentInfo,
   fetchBalances,
-  fetchHealth,
   type BalanceItem,
-  type HealthResponse,
 } from "../lib/api";
+import { deferNonCritical } from "../lib/defer";
 import { useWallet } from "./WalletContext";
 
 type AgentApiContextValue = {
-  health: HealthResponse | null;
-  healthError: string | null;
   balances: BalanceItem[];
   balanceAddress: string | null;
   balancesLoading: boolean;
   balancesError: string | null;
   refreshBalances: () => Promise<void>;
-  refreshHealth: () => Promise<void>;
 };
 
 const AgentApiContext = createContext<AgentApiContextValue | null>(null);
 
 export function AgentApiProvider({ children }: { children: ReactNode }) {
   const { address: connectedAddress } = useWallet();
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [healthError, setHealthError] = useState<string | null>(null);
   const [balances, setBalances] = useState<BalanceItem[]>([]);
   const [balanceAddress, setBalanceAddress] = useState<string | null>(null);
   const [balancesLoading, setBalancesLoading] = useState(true);
   const [balancesError, setBalancesError] = useState<string | null>(null);
-
-  const refreshHealth = useCallback(async () => {
-    try {
-      const h = await fetchHealth();
-      setHealth(h);
-      setHealthError(null);
-    } catch (err) {
-      setHealth(null);
-      setHealthError(err instanceof Error ? err.message : "Agent API offline");
-    }
-  }, []);
 
   const refreshBalances = useCallback(async () => {
     setBalancesLoading(true);
@@ -69,43 +52,27 @@ export function AgentApiProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setBalances([]);
       setBalanceAddress(null);
-      setBalancesError(err instanceof Error ? err.message : "Could not load balances");
+      setBalancesError(
+        err instanceof Error ? err.message : "Could not load balances"
+      );
     } finally {
       setBalancesLoading(false);
     }
   }, [connectedAddress]);
 
   useEffect(() => {
-    void refreshHealth();
-    const id = setInterval(() => void refreshHealth(), 30_000);
-    return () => clearInterval(id);
-  }, [refreshHealth]);
-
-  useEffect(() => {
-    void refreshBalances();
+    return deferNonCritical(() => void refreshBalances());
   }, [refreshBalances]);
 
   const value = useMemo(
     () => ({
-      health,
-      healthError,
       balances,
       balanceAddress,
       balancesLoading,
       balancesError,
       refreshBalances,
-      refreshHealth,
     }),
-    [
-      health,
-      healthError,
-      balances,
-      balanceAddress,
-      balancesLoading,
-      balancesError,
-      refreshBalances,
-      refreshHealth,
-    ]
+    [balances, balanceAddress, balancesLoading, balancesError, refreshBalances]
   );
 
   return (

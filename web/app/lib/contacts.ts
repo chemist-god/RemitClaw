@@ -8,8 +8,17 @@ export function matchContact(
   people: Person[]
 ): Person | undefined {
   if (!name) return undefined;
-  const lower = name.toLowerCase();
-  return people.find((p) => p.name.toLowerCase() === lower);
+  const lower = name.trim().toLowerCase();
+  const exact = people.find((p) => p.name.toLowerCase() === lower);
+  if (exact) return exact;
+  return people.find((p) => p.name.toLowerCase().startsWith(lower));
+}
+
+/** Extract a recipient name from common pay phrases ("send $50 to Mom"). */
+export function extractRecipientName(message: string): string | undefined {
+  const tail = message.match(/\bto\s+(.+)$/i)?.[1];
+  if (!tail) return undefined;
+  return tail.replace(/\s+in\s+.+$/i, "").trim() || undefined;
 }
 
 /** Build agent API context from a matched contact. */

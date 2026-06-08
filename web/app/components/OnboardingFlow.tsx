@@ -3,50 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { FAVOURITES } from "../data/people";
 import { Avatar } from "./Avatar";
 import { BoltIcon } from "./icons";
+import { useLanguage } from "../context/LanguageContext";
 
-const STEPS = [
-  {
-    id: "welcome",
-    title: (
-      <>
-        Send Crypto.
-        <br />
-        Simply.
-      </>
-    ),
-    subtitle:
-      "Pay your family across borders using stablecoins — as easy as sending a message.",
-  },
-  {
-    id: "ai-pay",
-    title: (
-      <>
-        Just say
-        <br />
-        who to pay.
-      </>
-    ),
-    subtitle:
-      'Try "Send $50 to Mom in the Philippines" — AI Pay handles routing and fees via Mento.',
-  },
-  {
-    id: "people",
-    title: (
-      <>
-        Add the people
-        <br />
-        you send to.
-      </>
-    ),
-    subtitle:
-      "Save contacts once, then pay them in one tap or by voice whenever you need.",
-  },
-] as const;
+function StepHero({ step }: { step: "welcome" | "ai-pay" | "people" }) {
+  const { t } = useLanguage();
 
-function StepHero({ step }: { step: (typeof STEPS)[number]["id"] }) {
   if (step === "welcome") {
     return (
       <div className="relative mt-2 flex flex-1 items-center justify-center">
@@ -57,6 +22,9 @@ function StepHero({ step }: { step: (typeof STEPS)[number]["id"] }) {
           width={520}
           height={360}
           priority
+          loading="eager"
+          fetchPriority="high"
+          sizes="(max-width: 440px) 88vw, 340px"
           className="animate-coin-bob relative w-[88%] max-w-[340px] drop-shadow-2xl"
         />
       </div>
@@ -67,19 +35,17 @@ function StepHero({ step }: { step: (typeof STEPS)[number]["id"] }) {
     return (
       <div className="relative mt-4 flex flex-1 flex-col justify-center gap-3 px-2">
         <div className="bubble bubble-bot self-start max-w-[85%]">
-          Hi! Who would you like to send money to today?
+          {t("onboarding.chatGreeting")}
         </div>
         <div className="bubble bubble-user self-end max-w-[85%]">
-          Send $50 to Mom in the Philippines
+          {t("onboarding.chatExample")}
         </div>
         <div className="bubble bubble-bot self-start max-w-[85%]">
           <span className="inline-flex items-center gap-1.5 font-semibold text-brand-700">
             <BoltIcon className="h-4 w-4" />
-            Mento route found
+            {t("onboarding.chatRoute")}
           </span>
-          <span className="mt-1 block text-[0.85rem]">
-            $50 USDm → Mom · est. fee $0.12
-          </span>
+          <span className="mt-1 block text-[0.85rem]">{t("onboarding.chatFee")}</span>
         </div>
       </div>
     );
@@ -88,10 +54,15 @@ function StepHero({ step }: { step: (typeof STEPS)[number]["id"] }) {
   return (
     <div className="relative mt-6 flex flex-1 flex-col items-center justify-center">
       <div className="people-scroll w-full justify-center px-2">
-        {["Mom", "Dad", "Sister"].map((name) => (
-          <div key={name} className="people-item pointer-events-none">
-            <Avatar name={name} ring />
-            <span className="people-name">{name}</span>
+        {FAVOURITES.map((person, index) => (
+          <div key={person.id} className="people-item pointer-events-none">
+            <Avatar
+              name={person.name}
+              src={person.avatar}
+              ring
+              priority={index === 0}
+            />
+            <span className="people-name">{person.name}</span>
           </div>
         ))}
         <div className="people-item pointer-events-none">
@@ -107,16 +78,57 @@ function StepHero({ step }: { step: (typeof STEPS)[number]["id"] }) {
 
 export function OnboardingFlow() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [step, setStep] = useState(0);
-  const current = STEPS[step];
-  const isLast = step === STEPS.length - 1;
+
+  const steps = useMemo(
+    () => [
+      {
+        id: "welcome" as const,
+        title: (
+          <>
+            {t("onboarding.welcomeTitle1")}
+            <br />
+            {t("onboarding.welcomeTitle2")}
+          </>
+        ),
+        subtitle: t("onboarding.welcomeSub"),
+      },
+      {
+        id: "ai-pay" as const,
+        title: (
+          <>
+            {t("onboarding.aiTitle1")}
+            <br />
+            {t("onboarding.aiTitle2")}
+          </>
+        ),
+        subtitle: t("onboarding.aiSub"),
+      },
+      {
+        id: "people" as const,
+        title: (
+          <>
+            {t("onboarding.peopleTitle1")}
+            <br />
+            {t("onboarding.peopleTitle2")}
+          </>
+        ),
+        subtitle: t("onboarding.peopleSub"),
+      },
+    ],
+    [t]
+  );
+
+  const current = steps[step];
+  const isLast = step === steps.length - 1;
 
   return (
     <div className="phone">
       <div className="screen px-7 pb-8 pt-5">
         <div className="flex justify-end">
           <Link href="/home" className="chip">
-            Skip
+            {t("common.skip")}
           </Link>
         </div>
 
@@ -130,9 +142,9 @@ export function OnboardingFlow() {
         </div>
 
         <div className="mt-7 flex items-center justify-center gap-2">
-          {STEPS.map((_, index) => (
+          {steps.map((s, index) => (
             <span
-              key={STEPS[index].id}
+              key={s.id}
               className={`h-2 rounded-full transition-all duration-300 ${
                 index === step ? "w-6 bg-brand-500" : "w-2 bg-brand-100"
               }`}
@@ -147,10 +159,10 @@ export function OnboardingFlow() {
               className="btn btn-gradient btn-block"
               onClick={() => router.push("/auth")}
             >
-              Create your wallet
+              {t("onboarding.createWallet")}
             </button>
             <Link href="/home" className="btn btn-light btn-block">
-              Maybe later
+              {t("onboarding.maybeLater")}
             </Link>
           </div>
         ) : (
@@ -159,7 +171,7 @@ export function OnboardingFlow() {
             className="btn btn-gradient btn-block mt-7"
             onClick={() => setStep((s) => s + 1)}
           >
-            Next
+            {t("common.next")}
           </button>
         )}
       </div>
