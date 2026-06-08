@@ -1,12 +1,20 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { loadConfig, type Config } from "./config/index.js";
 import {
+  bulkSyncContacts,
   executeForMessage,
   getAgentAddress,
   getBalances,
+  getClaimInfo,
+  getContactByName,
   getHistory,
+  importContactsFromPhone,
+  listContacts,
   quoteForMessage,
+  removeContact,
+  saveContact,
 } from "./api/service.js";
+import { StoredContactSchema } from "./contacts/types.js";
 import { buildAgentCard } from "./agent/agent-card.js";
 import { agentRegistryId } from "./agent/registry-addresses.js";
 import {
@@ -54,6 +62,7 @@ function transferContext(body: Record<string, unknown>) {
     destinationCountry?: string;
     recipientWallet?: string;
     recipientPhone?: string;
+    senderPhone?: string;
   } = {};
   if (body.destinationCountry) {
     ctx.destinationCountry = String(body.destinationCountry).toUpperCase();
@@ -62,6 +71,7 @@ function transferContext(body: Record<string, unknown>) {
     ctx.recipientWallet = String(body.recipientWallet);
   }
   if (body.recipientPhone) ctx.recipientPhone = String(body.recipientPhone);
+  if (body.senderPhone) ctx.senderPhone = String(body.senderPhone);
   return Object.keys(ctx).length ? ctx : undefined;
 }
 
@@ -88,6 +98,24 @@ const server = createServer(async (req, res) => {
         ok: true,
         chainId: config.celoChainId,
         executionReady: Boolean(config.agentPrivateKey),
+        vaultConfigured: Boolean(config.remifiVaultAddress),
+        contactsCount: listContacts(config).length,
+      });
+    }
+
+    if (req.method === "GET" && path === "/api/claim") {
+      const claimId = url.searchParams.get("claimId") ?? url.searchParams.get("c");
+      if (!claimId || !/^0x[a-fA-F0-9]{64}$/.test(claimId)) {
+        return sendJson(res, 400, { error: "valid ?claimId=0x… is required" });
+      }
+      const escrow = await getClaimInfo(config, claimId);
+      if (!escrow) {
+        return sendJson(res, 404, { error: "Claim not found" });
+      }
+      return sendJson(res, 200, {
+        claimId,
+        vaultAddress: config.remifiVaultAddress ?? null,
+        ...escrow,
       });
     }
 
@@ -167,6 +195,68 @@ const server = createServer(async (req, res) => {
         agentRegistry: agentRegistryId(config),
         registered: config.agentId != null,
       });
+    }
+
+    if (req.method === "GET" && path === "/api/contacts") {
+      const name = url.searchParams.get("name");
+      if (name) {
+        const contact = getContactByName(config, name);
+        if (!contact) return sendJson(res, 404, { error: "Contact not found" });
+        return sendJson(res, 200, { contact });
+      }
+      return sendJson(res, 200, { contacts: listContacts(config) });
+    }
+
+    if (req.method === "POST" && path === "/api/contacts/sync") {
+      const body = await readBody(req);
+      const raw = Array.isArray(body.contacts) ? body.contacts : [];
+      const contacts = raw
+        .map((item) => StoredContactSchema.safeParse(item))
+        .filter((r) => r.success)
+        .map((r) => r.data);
+      return sendJson(res, 200, {
+        contacts: bulkSyncContacts(config, contacts),
+      });
+    }
+
+    if (req.method === "POST" && path === "/api/contacts/import-phone") {
+      const body = await readBody(req);
+      const raw = Array.isArray(body.contacts) ? body.contacts : [];
+      const entries = raw
+        .map((item) => {
+          const row = item as Record<string, unknown>;
+          const name = String(row.name ?? "").trim();
+          const phone = String(row.phone ?? "").trim();
+          if (!name || !phone) return null;
+          return { name, phone };
+        })
+        .filter((e): e is { name: string; phone: string } => e !== null);
+
+      if (!entries.length) {
+        return sendJson(res, 400, { error: "contacts array with name+phone required" });
+      }
+
+      return sendJson(res, 200, {
+        imported: entries.length,
+        contacts: importContactsFromPhone(config, entries),
+      });
+    }
+
+    if (req.method === "POST" && path === "/api/contacts") {
+      const body = await readBody(req);
+      const parsed = StoredContactSchema.safeParse(body);
+      if (!parsed.success) {
+        return sendJson(res, 400, { error: "Invalid contact payload" });
+      }
+      return sendJson(res, 200, { contact: saveContact(config, parsed.data) });
+    }
+
+    if (req.method === "DELETE" && path.startsWith("/api/contacts/")) {
+      const id = decodeURIComponent(path.slice("/api/contacts/".length));
+      if (!id) return sendJson(res, 400, { error: "contact id required" });
+      const removed = removeContact(config, id);
+      if (!removed) return sendJson(res, 404, { error: "Contact not found" });
+      return sendJson(res, 200, { ok: true });
     }
 
     if (req.method === "GET" && path === "/api/history") {

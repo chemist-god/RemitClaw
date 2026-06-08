@@ -6,6 +6,8 @@
  *   npx tsx src/cli/remifi.ts quote "Send $5 to Mom in the Philippines"
  *   npx tsx src/cli/remifi.ts send "Send $5 to Mom in the Philippines" --yes
  *   npx tsx src/cli/remifi.ts send "..." --to-wallet 0xRecipient --yes
+ *   npx tsx src/cli/remifi.ts contacts
+ *   npx tsx src/cli/remifi.ts contacts Mom
  *   npx tsx src/cli/remifi.ts balance
  *   npx tsx src/cli/remifi.ts history
  *   npx tsx src/cli/remifi.ts health
@@ -15,14 +17,18 @@ import {
   executeForMessage,
   getAgentAddress,
   getBalances,
+  getContactByName,
   getHistory,
+  listContacts,
   quoteForMessage,
+  type TransferContext,
 } from "../api/service.js";
 
 interface Args {
   command?: string;
   message?: string;
   toWallet?: string;
+  toPhone?: string;
   yes: boolean;
 }
 
@@ -38,6 +44,7 @@ function parseArgs(): Args {
       continue;
     }
     if (a === "--to-wallet" && argv[i + 1]) args.toWallet = argv[++i];
+    else if (a === "--to-phone" && argv[i + 1]) args.toPhone = argv[++i];
     else if (a === "--yes" || a === "-y") args.yes = true;
     else if (a === "--message" && argv[i + 1]) args.message = argv[++i];
     else messageParts.push(a);
@@ -53,9 +60,17 @@ function ok(data: unknown) {
   console.log(JSON.stringify({ ok: true, ...((data as object) ?? {}) }, null, 2));
 }
 
-function fail(error: string, extra?: Record<string, unknown>) {
+function fail(error: string, extra?: Record<string, unknown>): never {
   console.log(JSON.stringify({ ok: false, error, ...extra }, null, 2));
   process.exit(1);
+  throw new Error(error);
+}
+
+function transferContext(args: Args): TransferContext | undefined {
+  const ctx: TransferContext = {};
+  if (args.toWallet) ctx.recipientWallet = args.toWallet;
+  if (args.toPhone) ctx.recipientPhone = args.toPhone;
+  return Object.keys(ctx).length ? ctx : undefined;
 }
 
 async function main() {
@@ -69,15 +84,29 @@ async function main() {
         executionReady: Boolean(config.agentPrivateKey),
         agentAddress: getAgentAddress(config),
         demoRecipient: config.demoRecipientAddress ?? null,
+        vaultAddress: config.remifiVaultAddress ?? null,
         apiPort: config.agentApiPort,
+        contactsCount: listContacts(config).length,
       });
+      return;
+    }
+
+    case "contacts": {
+      const lookup = args.message;
+      if (lookup) {
+        const contact = getContactByName(config, lookup);
+        if (!contact) fail(`No contact matching "${lookup}"`);
+        ok({ contact });
+        return;
+      }
+      ok({ contacts: listContacts(config) });
       return;
     }
 
     case "balance": {
       const address = getAgentAddress(config);
       if (!address) fail("AGENT_PRIVATE_KEY not set — cannot read agent balance.");
-      const items = await getBalances(config, address);
+      const items = await getBalances(config, address as string);
       ok({ address, items });
       return;
     }
@@ -88,17 +117,26 @@ async function main() {
     }
 
     case "quote": {
-      if (!args.message) fail('Usage: remifi quote "Send $5 to Mom in the Philippines"');
-      const quote = await quoteForMessage(config, args.message);
+      const message = args.message;
+      if (!message) fail('Usage: remifi quote "Send $5 to Mom in the Philippines"');
+      const quote = await quoteForMessage(
+        config,
+        message,
+        transferContext(args)
+      );
       ok({ quote });
       return;
     }
 
     case "send": {
-      if (!args.message) {
-        fail('Usage: remifi send "Send $5 to Mom in the Philippines" [--to-wallet 0x…] [--yes]');
+      const message = args.message;
+      if (!message) {
+        fail(
+          'Usage: remifi send "Send $5 to Mom in the Philippines" [--to-wallet 0x… | --to-phone +1…] [--yes]'
+        );
       }
-      const quote = await quoteForMessage(config, args.message);
+      const ctx = transferContext(args);
+      const quote = await quoteForMessage(config, message, ctx);
       if (quote.needsConfirmation && !args.yes) {
         ok({
           status: "needs_confirmation",
@@ -107,17 +145,20 @@ async function main() {
         });
         return;
       }
-      const result = await executeForMessage(
-        config,
-        args.message,
-        args.toWallet
-      );
-      ok({ result, explorerUrl: result.txHash ? `https://celoscan.io/tx/${result.txHash}` : null });
+      const result = await executeForMessage(config, message, ctx);
+      ok({
+        result,
+        explorerUrl: result.txHash
+          ? `https://celoscan.io/tx/${result.txHash}`
+          : null,
+      });
       return;
     }
 
     default:
-      fail("Unknown command. Use: quote | send | balance | history | health");
+      fail(
+        "Unknown command. Use: quote | send | contacts | balance | history | health"
+      );
   }
 }
 

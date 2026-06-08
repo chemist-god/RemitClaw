@@ -6,9 +6,24 @@ import { prepareTransfer } from "../transfers/executor.js";
 import { compareFees, formatSavings } from "../fees/comparison.js";
 import { scheduleRecurringTransfer } from "../transfers/scheduler.js";
 import { RemitClawAgent } from "../agent/remitclaw-agent.js";
-import { loadTransactions } from "../history/store.js";
+import { loadTransactions, saveTransaction } from "../history/store.js";
 import { CELO_MAINNET_TOKENS } from "../mento/client.js";
 import { getAgentAccount, getTokenBalance } from "../wallet/client.js";
+import { resolveContactContext } from "../contacts/resolve.js";
+import {
+  findContactByName,
+  findContactByPhone,
+  importPhoneContacts,
+  loadContacts,
+  syncContacts,
+  upsertContact,
+  deleteContact,
+} from "../contacts/store.js";
+import type { PhoneImportEntry } from "../contacts/types.js";
+import type { StoredContact } from "../contacts/types.js";
+import { executeEscrowRemittance, readEscrow, vaultConfigured } from "../escrow/client.js";
+import { notifyClaimLink } from "../notifications/twilio.js";
+import { executeRemittance } from "../transfers/onchain.js";
 
 export interface QuoteResult {
   kind: "quote" | "schedule";
@@ -23,6 +38,8 @@ export interface QuoteResult {
   routeHops?: number;
   mentoPair?: string;
   scheduleNextRunAt?: string;
+  deliveryMethod?: "wallet" | "escrow";
+  matchedContact?: string;
 }
 
 export interface ExecuteResult {
@@ -33,6 +50,9 @@ export interface ExecuteResult {
   destinationCurrency: string;
   summary: string;
   savings: string;
+  deliveryMethod?: "wallet" | "escrow";
+  claimUrl?: string;
+  notificationSent?: boolean;
 }
 
 /** Optional contact fields from the web app (override parsed intent). */
@@ -40,6 +60,8 @@ export interface TransferContext {
   destinationCountry?: string;
   recipientWallet?: string;
   recipientPhone?: string;
+  /** WhatsApp / channel sender — used to match contacts by phone. */
+  senderPhone?: string;
 }
 
 function applyTransferContext(
@@ -55,13 +77,46 @@ function applyTransferContext(
   };
 }
 
+/** Merge parsed intent with saved contacts and explicit caller context. */
+export function resolveIntent(
+  config: Config,
+  message: string,
+  ctx?: TransferContext
+): { intent: RemittanceIntent; matchedContact?: string } {
+  const parsed = parseRemittanceIntent(message);
+  const contactCtx = resolveContactContext(
+    config.dataDir,
+    parsed.recipientName,
+    ctx?.senderPhone
+  );
+  const matched =
+    findContactByName(config.dataDir, parsed.recipientName ?? "") ??
+    (ctx?.senderPhone
+      ? findContactByPhone(config.dataDir, ctx.senderPhone)
+      : undefined);
+  const matchedContact = matched?.name;
+
+  let intent = applyTransferContext(parsed, contactCtx);
+  intent = applyTransferContext(intent, ctx);
+  return { intent, matchedContact };
+}
+
+function deliveryHint(intent: RemittanceIntent, config: Config): {
+  method: "wallet" | "escrow" | "demo" | "missing";
+} {
+  if (intent.recipientWallet) return { method: "wallet" };
+  if (intent.recipientPhone && vaultConfigured(config)) return { method: "escrow" };
+  if (config.demoRecipientAddress) return { method: "demo" };
+  return { method: "missing" };
+}
+
 /** Parse a message and (for one-time sends) attach a live Mento quote + fee comparison. */
 export async function quoteForMessage(
   config: Config,
   message: string,
   ctx?: TransferContext
 ): Promise<QuoteResult> {
-  const intent = applyTransferContext(parseRemittanceIntent(message), ctx);
+  const { intent, matchedContact } = resolveIntent(config, message, ctx);
 
   if (intent.frequency !== "once") {
     const schedule = scheduleRecurringTransfer(config.dataDir, intent);
@@ -70,6 +125,7 @@ export async function quoteForMessage(
       intent,
       summary: `Scheduled ${intent.frequency} transfer of ${intent.amount} ${intent.sourceCurrency} to ${intent.destinationCountry}. Next run: ${schedule.nextRunAt}`,
       scheduleNextRunAt: schedule.nextRunAt,
+      matchedContact,
     };
   }
 
@@ -87,12 +143,23 @@ export async function quoteForMessage(
     recipientReceives
   );
   const savings = formatSavings(comparisons);
+  const delivery = deliveryHint(intent, config);
+
+  const deliveryLine =
+    delivery.method === "escrow"
+      ? "Delivery: claim link via SMS/WhatsApp (phone on file)"
+      : delivery.method === "wallet"
+        ? "Delivery: direct to wallet on file"
+        : delivery.method === "demo"
+          ? "Delivery: demo wallet (add phone or wallet on contact)"
+          : "Delivery: add a wallet or phone on the contact to continue";
 
   const summary = [
     `Route: ${corridor.mentoPair} (${quote.routeHops} hop${quote.routeHops === 1 ? "" : "s"})`,
     `Send: ${intent.amount} ${intent.sourceCurrency}`,
     `Recipient receives: ~${recipientReceives.toFixed(2)} ${corridor.destinationCurrency}`,
     `Mento fee: ~$${quote.mentoFeeUsd.toFixed(2)} | Gas: ~$${quote.estimatedGasUsd.toFixed(4)}`,
+    deliveryLine,
     savings,
   ].join("\n");
 
@@ -108,31 +175,26 @@ export async function quoteForMessage(
     estimatedGasUsd: quote.estimatedGasUsd,
     routeHops: quote.routeHops,
     mentoPair: corridor.mentoPair,
+    deliveryMethod:
+      delivery.method === "escrow"
+        ? "escrow"
+        : delivery.method === "wallet"
+          ? "wallet"
+          : undefined,
+    matchedContact,
   };
 }
 
 /**
  * Execute a transfer derived from a natural-language message.
- *
- * `recipientWallet` overrides the parsed intent; if neither is present the
- * configured demo recipient is used so the agent can still produce a real tx.
+ * Wallet → direct on-chain send. Phone only → escrow vault + claim link.
  */
 export async function executeForMessage(
   config: Config,
   message: string,
   ctx?: TransferContext
 ): Promise<ExecuteResult> {
-  const intent = applyTransferContext(parseRemittanceIntent(message), ctx);
-  const recipient =
-    ctx?.recipientWallet || intent.recipientWallet || config.demoRecipientAddress;
-
-  if (!recipient) {
-    throw new Error(
-      "No recipient wallet. Provide recipientWallet or set DEMO_RECIPIENT_ADDRESS."
-    );
-  }
-  intent.recipientWallet = recipient;
-
+  const { intent } = resolveIntent(config, message, ctx);
   const { corridor, quote } = await prepareTransfer(config, intent);
   const corridorKey = `${corridor.sourceCurrency}-${corridor.destinationCountry.slice(0, 2)}`;
   const recipientReceives = Number(formatUnits(quote.amountOut, 18));
@@ -142,6 +204,63 @@ export async function executeForMessage(
     quote.mentoFeeUsd,
     recipientReceives
   );
+  const savings = formatSavings(comparisons);
+
+  const delivery = deliveryHint(intent, config);
+
+  if (delivery.method === "escrow" && intent.recipientPhone) {
+    const escrow = await executeEscrowRemittance(
+      config,
+      corridor,
+      quote,
+      intent.recipientPhone
+    );
+
+    const record = {
+      id: crypto.randomUUID(),
+      intent: { ...intent, recipientPhone: intent.recipientPhone },
+      txHash: escrow.txHash,
+      status: "confirmed" as const,
+      createdAt: new Date().toISOString(),
+      confirmedAt: new Date().toISOString(),
+      feeComparison: comparisons,
+      deliveryMethod: "escrow" as const,
+      claimId: escrow.claim.claimId,
+      claimUrl: escrow.claim.claimUrl,
+    };
+    saveTransaction(config.dataDir, record);
+
+    const notification = await notifyClaimLink(
+      config,
+      intent,
+      escrow.claim.claimUrl,
+      recipientReceives,
+      corridor.destinationCurrency
+    );
+
+    return {
+      status: "confirmed",
+      receiptId: record.id,
+      txHash: escrow.txHash,
+      recipientReceives,
+      destinationCurrency: corridor.destinationCurrency,
+      summary: `Sent ${intent.amount} ${intent.sourceCurrency} → ~${recipientReceives.toFixed(2)} ${corridor.destinationCurrency} (claim link)`,
+      savings,
+      deliveryMethod: "escrow",
+      claimUrl: escrow.claim.claimUrl,
+      notificationSent: Boolean(notification?.sid),
+    };
+  }
+
+  const recipient =
+    intent.recipientWallet || config.demoRecipientAddress;
+
+  if (!recipient) {
+    throw new Error(
+      "No recipient wallet or phone. Save a contact with a phone number (for claim escrow) or wallet address."
+    );
+  }
+  intent.recipientWallet = recipient;
 
   const agent = new RemitClawAgent(config);
   const record = await agent.executeTransfer(intent, corridor, quote, comparisons);
@@ -153,8 +272,50 @@ export async function executeForMessage(
     recipientReceives,
     destinationCurrency: corridor.destinationCurrency,
     summary: `Sent ${intent.amount} ${intent.sourceCurrency} → ~${recipientReceives.toFixed(2)} ${corridor.destinationCurrency}`,
-    savings: formatSavings(comparisons),
+    savings,
+    deliveryMethod: "wallet",
   };
+}
+
+export function listContacts(config: Config): StoredContact[] {
+  return loadContacts(config.dataDir);
+}
+
+export function getContactByName(
+  config: Config,
+  name: string
+): StoredContact | undefined {
+  return findContactByName(config.dataDir, name);
+}
+
+export function saveContact(
+  config: Config,
+  contact: StoredContact
+): StoredContact {
+  return upsertContact(config.dataDir, contact);
+}
+
+export function bulkSyncContacts(
+  config: Config,
+  contacts: StoredContact[]
+): StoredContact[] {
+  return syncContacts(config.dataDir, contacts);
+}
+
+/** Import device address-book entries into the agent contact store. */
+export function importContactsFromPhone(
+  config: Config,
+  entries: PhoneImportEntry[]
+): StoredContact[] {
+  return importPhoneContacts(config.dataDir, entries);
+}
+
+export function removeContact(config: Config, id: string): boolean {
+  return deleteContact(config.dataDir, id);
+}
+
+export async function getClaimInfo(config: Config, claimId: string) {
+  return readEscrow(config, claimId as `0x${string}`);
 }
 
 /**
@@ -179,6 +340,8 @@ export interface HistoryItem {
   recipientName?: string;
   txHash?: string;
   createdAt: string;
+  deliveryMethod?: string;
+  claimUrl?: string;
 }
 
 export function getHistory(config: Config): HistoryItem[] {
@@ -192,6 +355,8 @@ export function getHistory(config: Config): HistoryItem[] {
       recipientName: r.intent.recipientName,
       txHash: r.txHash,
       createdAt: r.createdAt,
+      deliveryMethod: r.deliveryMethod,
+      claimUrl: r.claimUrl,
     }))
     .reverse();
 }

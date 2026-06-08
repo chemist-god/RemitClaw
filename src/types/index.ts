@@ -57,6 +57,8 @@ export interface FeeComparison {
   effectiveRate: number;
 }
 
+export type DeliveryMethod = "wallet" | "escrow";
+
 export interface TransferRecord {
   id: string;
   intent: RemittanceIntent;
@@ -65,6 +67,9 @@ export interface TransferRecord {
   createdAt: string;
   confirmedAt?: string;
   feeComparison?: FeeComparison[];
+  deliveryMethod?: DeliveryMethod;
+  claimId?: string;
+  claimUrl?: string;
 }
 
 export interface SpendingLimits {

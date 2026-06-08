@@ -17,26 +17,40 @@ function buildReceiptMessage(intent: RemittanceIntent, txHash?: string): string 
   return lines.join("\n");
 }
 
-export async function notifyRecipient(
-  config: Config,
+function buildClaimMessage(
   intent: RemittanceIntent,
-  txHash?: string
+  claimUrl: string,
+  recipientReceives: number,
+  destinationCurrency: string
+): string {
+  const lines = [
+    `You received ~${recipientReceives.toFixed(2)} ${destinationCurrency} via RemitClaw.`,
+    intent.recipientName
+      ? `Someone sent money for ${intent.recipientName}.`
+      : undefined,
+    `Claim to your wallet: ${claimUrl}`,
+    "Link expires in 30 days if unclaimed.",
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
+async function sendTwilioMessage(
+  config: Config,
+  phone: string,
+  body: string
 ): Promise<NotificationResult | null> {
-  const phone = intent.recipientPhone;
-  if (!phone || !config.twilioAccountSid || !config.twilioAuthToken) {
-    return null;
-  }
+  if (!config.twilioAccountSid || !config.twilioAuthToken) return null;
 
   const twilio = (await import("twilio")).default;
   const client = twilio(config.twilioAccountSid, config.twilioAuthToken);
-  const body = buildReceiptMessage(intent, txHash);
 
   const useWhatsapp = phone.startsWith("whatsapp:") || config.twilioWhatsappFrom;
-  const to = phone.startsWith("whatsapp:") ? phone : useWhatsapp ? `whatsapp:${phone}` : phone;
-  const from = useWhatsapp
-    ? config.twilioWhatsappFrom
-    : config.twilioSmsFrom;
-
+  const to = phone.startsWith("whatsapp:")
+    ? phone
+    : useWhatsapp
+      ? `whatsapp:${phone}`
+      : phone;
+  const from = useWhatsapp ? config.twilioWhatsappFrom : config.twilioSmsFrom;
   if (!from) return null;
 
   try {
@@ -53,4 +67,30 @@ export async function notifyRecipient(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+export async function notifyRecipient(
+  config: Config,
+  intent: RemittanceIntent,
+  txHash?: string
+): Promise<NotificationResult | null> {
+  const phone = intent.recipientPhone;
+  if (!phone) return null;
+  return sendTwilioMessage(config, phone, buildReceiptMessage(intent, txHash));
+}
+
+export async function notifyClaimLink(
+  config: Config,
+  intent: RemittanceIntent,
+  claimUrl: string,
+  recipientReceives: number,
+  destinationCurrency: string
+): Promise<NotificationResult | null> {
+  const phone = intent.recipientPhone;
+  if (!phone) return null;
+  return sendTwilioMessage(
+    config,
+    phone,
+    buildClaimMessage(intent, claimUrl, recipientReceives, destinationCurrency)
+  );
 }

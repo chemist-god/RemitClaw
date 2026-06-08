@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PROFILE } from "../data/people";
 import { Avatar } from "./Avatar";
 import { BellIcon, ChevronDownIcon, ScanIcon } from "./icons";
+import { LanguageSelector } from "./LanguageSelector";
 import { NotificationsSheet } from "./NotificationsSheet";
 import { ScanSheet } from "./ScanSheet";
 
@@ -26,6 +27,7 @@ export function AppHeader() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
+          <LanguageSelector variant="compact" />
           <button
             type="button"
             className="icon-btn"
