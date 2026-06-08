@@ -14,5 +14,5 @@ coverage/
 contract/cache/
 contract/out/
 
-# taking way the how it works md file 
-.howitworks.md\\
+# Local-only guide (not published to remote)
+howitworks.md
