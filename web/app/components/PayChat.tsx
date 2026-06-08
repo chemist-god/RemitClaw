@@ -4,18 +4,29 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Avatar } from "./Avatar";
-import { ConfirmationModal } from "./ConfirmationModal";
-import { useContacts } from "../context/ContactsContext";
+import { ConfirmationModal, type ConfirmationDetail } from "./ConfirmationModal";
 import { ASSISTANT, PROFILE } from "../data/people";
 import { BoltIcon, ChevronLeftIcon, MicIcon } from "./icons";
+import {
+  executeTransfer,
+  explorerTxUrl,
+  fetchQuote,
+  type QuoteResponse,
+} from "../lib/api";
 
 type Message =
-  | { id: string; role: "bot"; text: string; confirm?: { label: string; amount: number; to: string } }
+  | {
+      id: string;
+      role: "bot";
+      text: string;
+      txHash?: string;
+      confirm?: { label: string; message: string; quote: QuoteResponse };
+    }
   | { id: string; role: "user"; text: string };
 
 const QUICK_REPLIES = [
-  { label: "Send $50 to Mom", to: "Mom", amount: 50 },
-  { label: "Send 100 USDm to Dad", to: "Dad", amount: 100 },
+  { label: "Send $50 to Mom" },
+  { label: "Send 100 USDm to Dad" },
 ];
 
 function introMessages(): Message[] {
@@ -28,14 +39,42 @@ function introMessages(): Message[] {
   ];
 }
 
-function parseIntent(text: string): { to: string; amount: number } | null {
-  const match = text.match(/send\s+\$?(\d+(?:\.\d+)?)\s*(?:usdm|usd|eurm|eur)?\s+to\s+(\w+)/i);
-  if (!match) return null;
-  return { amount: Number(match[1]), to: match[2] };
+type PendingPayment = {
+  message: string;
+  recipientName: string;
+  quote: QuoteResponse;
+  details: ConfirmationDetail[];
+};
+
+function quoteDetails(quote: QuoteResponse): ConfirmationDetail[] {
+  const { intent } = quote;
+  const rows: ConfirmationDetail[] = [
+    { label: "To", value: intent.recipientName ?? "Recipient" },
+    {
+      label: "Amount",
+      value: `${intent.amount} ${intent.sourceCurrency}`,
+    },
+  ];
+  if (quote.recipientReceives != null && quote.destinationCurrency) {
+    rows.push({
+      label: "They receive",
+      value: `~${quote.recipientReceives.toFixed(2)} ${quote.destinationCurrency}`,
+    });
+  }
+  if (quote.mentoPair) rows.push({ label: "Route", value: quote.mentoPair });
+  if (quote.mentoFeeUsd != null) {
+    rows.push({ label: "Mento fee", value: `~$${quote.mentoFeeUsd.toFixed(2)}` });
+  }
+  if (quote.estimatedGasUsd != null) {
+    rows.push({
+      label: "Est. gas",
+      value: `~$${quote.estimatedGasUsd.toFixed(4)}`,
+    });
+  }
+  return rows;
 }
 
 export function PayChat() {
-  const { findPerson } = useContacts();
   const searchParams = useSearchParams();
   const presetTo = searchParams.get("to");
   const presetAmount = searchParams.get("amount");
@@ -49,95 +88,105 @@ export function PayChat() {
   );
   const [messages, setMessages] = useState<Message[]>(introMessages);
   const presetSent = useRef(false);
+  const [thinking, setThinking] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalPhase, setModalPhase] = useState<"confirm" | "success">("confirm");
-  const [pendingPayment, setPendingPayment] = useState<{
-    amount: number;
-    to: string;
-    country?: string;
-  } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(
+    null
+  );
 
-  const sendMessage = (text: string, silent = false) => {
+  const appendBot = (msg: Omit<Extract<Message, { role: "bot" }>, "id" | "role">) =>
+    setMessages((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), role: "bot", ...msg },
+    ]);
+
+  const sendMessage = async (text: string, silent = false) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || thinking) return;
 
-    const intent = parseIntent(trimmed);
-    const userMsg: Message = { id: crypto.randomUUID(), role: "user", text: trimmed };
-    const next: Message[] = [userMsg];
+    setMessages((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), role: "user", text: trimmed },
+    ]);
+    if (!silent) setInput("");
+    setThinking(true);
 
-    if (intent) {
-      const person = findPerson(intent.to);
-      const destination = person?.country ?? "their country";
-      next.push({
-        id: crypto.randomUUID(),
-        role: "bot",
-        text: `Perfect! I'll help you send ${intent.amount} USD to ${intent.to}${person ? ` in ${destination}` : ""} via Mento. Tap below to confirm the payment.`,
+    try {
+      const quote = await fetchQuote(trimmed);
+
+      if (quote.kind === "schedule") {
+        appendBot({ text: quote.summary });
+        return;
+      }
+
+      const recipientName = quote.intent.recipientName ?? "your recipient";
+      appendBot({
+        text: quote.summary,
         confirm: {
-          label: `Confirm $${intent.amount} to ${intent.to}`,
-          amount: intent.amount,
-          to: intent.to,
+          label: `Confirm ${quote.intent.amount} ${quote.intent.sourceCurrency} to ${recipientName}`,
+          message: trimmed,
+          quote,
         },
       });
-    } else {
-      next.push({
-        id: crypto.randomUUID(),
-        role: "bot",
-        text: `I can help with transfers like "Send $50 to Mom". Who would you like to pay?`,
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "Something went wrong";
+      appendBot({
+        text: `I couldn't put together that transfer. ${reason}. Try something like "Send $50 to Mom".`,
       });
+    } finally {
+      setThinking(false);
     }
-
-    setMessages((prev) => [...prev, ...next]);
-    if (!silent) setInput("");
   };
 
   useEffect(() => {
     if (presetSent.current || !presetTo) return;
     presetSent.current = true;
     const amount = presetAmount ? Number(presetAmount) : 50;
-    sendMessage(`Send $${amount} to ${presetTo}`, true);
+    void sendMessage(`Send $${amount} to ${presetTo}`, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetTo, presetAmount]);
 
   const quickReplies = useMemo(() => QUICK_REPLIES, []);
 
-  const paymentDetails = useMemo(() => {
-    if (!pendingPayment) return [];
-    return [
-      { label: "To", value: pendingPayment.to },
-      ...(pendingPayment.country
-        ? [{ label: "Country", value: pendingPayment.country }]
-        : []),
-      { label: "Amount", value: `$${pendingPayment.amount} USDm` },
-      { label: "Route", value: "Mento on Celo" },
-      { label: "Est. fee", value: "~$0.12" },
-    ];
-  }, [pendingPayment]);
-
-  const openPaymentModal = (amount: number, to: string) => {
-    const person = findPerson(to);
+  const openPaymentModal = (confirm: {
+    message: string;
+    quote: QuoteResponse;
+  }) => {
     setPendingPayment({
-      amount,
-      to,
-      country: person?.country,
+      message: confirm.message,
+      recipientName: confirm.quote.intent.recipientName ?? "your recipient",
+      quote: confirm.quote,
+      details: quoteDetails(confirm.quote),
     });
     setModalPhase("confirm");
     setModalOpen(true);
   };
 
-  const handleConfirmPayment = () => {
-    if (!pendingPayment) return;
-    setModalPhase("success");
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        role: "bot",
-        text: `Done! $${pendingPayment.amount} USDm is on its way to ${pendingPayment.to}. They'll receive a notification shortly.`,
-      },
-    ]);
+  const handleConfirmPayment = async () => {
+    if (!pendingPayment || submitting) return;
+    setSubmitting(true);
+    try {
+      const result = await executeTransfer(pendingPayment.message);
+      setModalPhase("success");
+      appendBot({
+        text:
+          `Done! ${result.summary}. ${result.savings}` +
+          (result.txHash ? `\nReceipt: ${result.receiptId}` : ""),
+        txHash: result.txHash,
+      });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "Transfer failed";
+      setModalOpen(false);
+      appendBot({ text: `The transfer didn't go through. ${reason}` });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClosePaymentModal = () => {
+    if (submitting) return;
     setModalOpen(false);
     setModalPhase("confirm");
     setPendingPayment(null);
@@ -161,12 +210,22 @@ export function PayChat() {
                 <Avatar name={ASSISTANT.name} src={ASSISTANT.avatar} size={26} ring />
                 <span className="text-xs font-bold text-brand-700">{ASSISTANT.name}</span>
               </div>
-              <div className="bubble bubble-bot">{msg.text}</div>
+              <div className="bubble bubble-bot whitespace-pre-line">{msg.text}</div>
+              {msg.txHash && (
+                <a
+                  href={explorerTxUrl(msg.txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 self-start text-xs font-semibold text-brand-700 underline underline-offset-2"
+                >
+                  View on explorer ↗
+                </a>
+              )}
               {msg.confirm && (
                 <button
                   type="button"
                   className="btn btn-dark mt-1 self-start"
-                  onClick={() => openPaymentModal(msg.confirm!.amount, msg.confirm!.to)}
+                  onClick={() => openPaymentModal(msg.confirm!)}
                 >
                   <BoltIcon className="h-4 w-4 text-accent-400" />
                   {msg.confirm.label}
@@ -183,6 +242,15 @@ export function PayChat() {
             </div>
           )
         )}
+        {thinking && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <Avatar name={ASSISTANT.name} src={ASSISTANT.avatar} size={26} ring />
+              <span className="text-xs font-bold text-brand-700">{ASSISTANT.name}</span>
+            </div>
+            <div className="bubble bubble-bot text-soft">Getting a live quote…</div>
+          </div>
+        )}
       </div>
 
       <div className="pay-composer">
@@ -192,7 +260,8 @@ export function PayChat() {
               key={q.label}
               type="button"
               className="chip"
-              onClick={() => sendMessage(q.label)}
+              disabled={thinking}
+              onClick={() => void sendMessage(q.label)}
             >
               {q.label}
             </button>
@@ -202,7 +271,7 @@ export function PayChat() {
           className="flex items-center gap-2 rounded-[var(--radius-pill)] border border-line bg-surface p-1.5 pl-4 shadow-[0_16px_30px_-16px_rgba(15,15,20,0.35)]"
           onSubmit={(e) => {
             e.preventDefault();
-            sendMessage(input);
+            void sendMessage(input);
           }}
         >
           <input
@@ -215,7 +284,7 @@ export function PayChat() {
           <button type="button" className="icon-btn shrink-0" aria-label="Voice input">
             <MicIcon className="h-[1.15rem] w-[1.15rem]" />
           </button>
-          <button type="submit" className="btn btn-dark shrink-0 px-5">
+          <button type="submit" className="btn btn-dark shrink-0 px-5" disabled={thinking}>
             Pay
           </button>
         </form>
@@ -225,8 +294,15 @@ export function PayChat() {
         open={modalOpen}
         variant="sent"
         phase={modalPhase}
-        recipientName={pendingPayment?.to}
-        details={paymentDetails}
+        recipientName={pendingPayment?.recipientName}
+        message={
+          modalPhase === "success"
+            ? "Your transfer is confirmed on Celo. The recipient will be notified."
+            : pendingPayment?.quote.savings
+        }
+        details={pendingPayment?.details}
+        busy={submitting}
+        busyLabel="Sending on-chain…"
         onConfirm={handleConfirmPayment}
         onClose={handleClosePaymentModal}
       />

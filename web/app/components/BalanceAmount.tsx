@@ -1,19 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWalletPreferences } from "../context/WalletPreferencesContext";
 import { CurrencyPickerButton } from "./CurrencyPickerSheet";
 import { EyeIcon, EyeOffIcon } from "./icons";
+import { fetchAgentAddress, fetchBalances } from "../lib/api";
+
+type LiveItem = { symbol: string; balance: number };
+
+/** Map a token symbol (USDm) to its display currency code (USD). */
+function symbolToCode(symbol: string): string {
+  return symbol.replace(/m$/, "");
+}
+
+/** Total for a currency from live balances; USD sums everything (demo parity). */
+function liveTotalForCode(items: LiveItem[], code: string): number {
+  if (code === "USD") return items.reduce((sum, item) => sum + item.balance, 0);
+  return items.find((item) => symbolToCode(item.symbol) === code)?.balance ?? 0;
+}
 
 export function BalanceAmount() {
   const {
     balanceVisible,
     toggleBalanceVisible,
     currency,
+    currencyCode,
     balanceAmount,
   } = useWalletPreferences();
 
-  const [whole, cents] = balanceAmount.toFixed(2).split(".");
+  const [liveItems, setLiveItems] = useState<LiveItem[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const agent = await fetchAgentAddress();
+        if (!agent.address) return;
+        const { items } = await fetchBalances(agent.address);
+        if (!cancelled && items.length > 0) setLiveItems(items);
+      } catch {
+        // Keep the static balance when the agent API is unavailable.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const amount = liveItems
+    ? liveTotalForCode(liveItems, currencyCode)
+    : balanceAmount;
+
+  const [whole, cents] = amount.toFixed(2).split(".");
 
   return (
     <>

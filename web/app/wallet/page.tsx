@@ -5,7 +5,8 @@ import { Avatar } from "../components/Avatar";
 import { BalanceSection } from "../components/BalanceSection";
 import { PhoneShell } from "../components/PhoneShell";
 import { TokenIcon } from "../components/TokenIcon";
-import { findPerson, getAsset, RECENT_TX, WALLET_ASSETS } from "../data/people";
+import { WalletAssets } from "../components/WalletAssets";
+import { findPerson, getAsset, RECENT_TX } from "../data/people";
 
 export default function WalletScreen() {
   return (
@@ -15,34 +16,7 @@ export default function WalletScreen() {
         <BalanceSection />
         <ActionButtons />
 
-        <section className="mt-7">
-          <h2 className="text-[1.05rem] text-ink">Assets</h2>
-          <div className="mt-3 flex flex-col gap-2.5">
-            {WALLET_ASSETS.map((asset) => (
-              <div key={asset.symbol} className="asset-row">
-                <TokenIcon src={asset.logo} alt={asset.symbol} size={40} />
-                <div className="min-w-0 flex-1">
-                  <p className="font-bold text-ink">{asset.symbol}</p>
-                  <p className="text-xs text-muted">{asset.name}</p>
-                </div>
-                <div className="text-right">
-                  <p className="tnum font-bold text-ink">
-                    {asset.balance.toLocaleString()} {asset.code}
-                  </p>
-                  <p
-                    className={`text-xs font-semibold ${
-                      asset.change.startsWith("+")
-                        ? "text-accent-600"
-                        : "text-muted"
-                    }`}
-                  >
-                    {asset.change}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <WalletAssets />
 
         <section className="mt-7">
           <h2 className="text-[1.05rem] text-ink">Recent</h2>

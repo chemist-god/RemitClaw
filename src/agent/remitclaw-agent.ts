@@ -1,11 +1,13 @@
+import type { Address } from "viem";
 import type { Config } from "../config/index.js";
-import type { RemittanceIntent, TransferRecord } from "../types/index.js";
+import type { Corridor, RemittanceIntent, RouteQuote, TransferRecord } from "../types/index.js";
 import { parseRemittanceIntent } from "../intent/parser.js";
 import { compareFees, formatSavings } from "../fees/comparison.js";
 import { prepareTransfer } from "../transfers/executor.js";
 import { scheduleRecurringTransfer } from "../transfers/scheduler.js";
 import { saveTransaction } from "../history/store.js";
 import { notifyRecipient } from "../notifications/twilio.js";
+import { executeRemittance } from "../transfers/onchain.js";
 import { formatUnits } from "viem";
 
 export interface AgentResponse {
@@ -60,9 +62,12 @@ export class RemitClawAgent {
       };
     }
 
-    const record = await this.executeTransfer(intent, comparisons);
+    const record = await this.executeTransfer(intent, corridor, quote, comparisons);
+    const txLine = record.txHash
+      ? `\nTx: ${record.txHash}`
+      : "";
     return {
-      message: `${summary}\n\nTransfer submitted. Receipt ID: ${record.id}`,
+      message: `${summary}\n\nTransfer ${record.status}. Receipt ID: ${record.id}${txLine}`,
       intent,
       record,
     };
@@ -70,6 +75,8 @@ export class RemitClawAgent {
 
   async executeTransfer(
     intent: RemittanceIntent,
+    corridor: Corridor,
+    quote: RouteQuote,
     feeComparison?: ReturnType<typeof compareFees>
   ): Promise<TransferRecord> {
     const record: TransferRecord = {
@@ -80,13 +87,31 @@ export class RemitClawAgent {
       feeComparison,
     };
 
-    // On-chain execution: wire up Mento swap + wallet client here
-    // record.txHash = await executeMentoSwap(...)
+    if (!intent.recipientWallet) {
+      record.status = "failed";
+      saveTransaction(this.config.dataDir, record);
+      throw new Error(
+        "No recipient wallet address. Add the recipient's 0x address (or use the claim flow) before sending."
+      );
+    }
 
-    record.status = "confirmed";
-    record.confirmedAt = new Date().toISOString();
+    try {
+      const result = await executeRemittance(
+        this.config,
+        corridor,
+        quote,
+        intent.recipientWallet as Address
+      );
+      record.txHash = result.txHash;
+      record.status = "confirmed";
+      record.confirmedAt = new Date().toISOString();
+    } catch (err) {
+      record.status = "failed";
+      saveTransaction(this.config.dataDir, record);
+      throw err;
+    }
+
     saveTransaction(this.config.dataDir, record);
-
     await notifyRecipient(this.config, intent, record.txHash);
     return record;
   }

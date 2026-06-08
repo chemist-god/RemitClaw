@@ -1,25 +1,37 @@
 {
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "openrouter": {
+        "apiKey": "${OPENROUTER_API_KEY}"
+      }
+    }
+  },
   "agents": {
     "defaults": {
-      "skills": ["remitclaw"],
-      "model": "claude-sonnet-4-20250514"
+      "skills": ["remifi"],
+      "model": "openrouter/anthropic/claude-sonnet-4"
     },
     "list": [
       {
-        "id": "remitclaw",
-        "name": "RemitClaw",
+        "id": "remifi",
+        "name": "Remifi",
         "workspace": ".",
-        "skills": ["remitclaw"]
+        "skills": ["remifi"]
       }
     ]
   },
   "skills": {
     "entries": {
-      "remitclaw": {
+      "remifi": {
         "enabled": true,
         "env": {
           "CELO_RPC_URL": "${CELO_RPC_URL}",
-          "AGENT_PRIVATE_KEY": "${AGENT_PRIVATE_KEY}"
+          "CELO_CHAIN_ID": "${CELO_CHAIN_ID}",
+          "AGENT_PRIVATE_KEY": "${AGENT_PRIVATE_KEY}",
+          "AGENT_ID": "${AGENT_ID}",
+          "DEMO_RECIPIENT_ADDRESS": "${DEMO_RECIPIENT_ADDRESS}",
+          "DATA_DIR": "${DATA_DIR}"
         }
       }
     },

@@ -1184,3 +1184,36 @@
 @utility animate-coin-bob {
   animation: coin-bob 5s ease-in-out infinite;
 }
+
+/* ============================================================
+   thirdweb wallet modals — light, mobile-friendly
+   ============================================================ */
+@layer base {
+  /* Keep wallet UI above app sheets and nav */
+  body > div:has(.tw-modal) {
+    z-index: 2147483647 !important;
+  }
+
+  .tw-modal {
+    z-index: 2147483647 !important;
+    max-height: calc(100dvh - env(safe-area-inset-bottom)) !important;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* DynamicHeight inner panel: allow scroll on small screens */
+  .tw-modal > div > div {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    max-height: calc(
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1.5rem
+    ) !important;
+  }
+
+  /* Match app primary button styling for the connect trigger */
+  .tw-connect-btn {
+    width: 100%;
+    border-radius: var(--radius-pill) !important;
+    font-weight: 600 !important;
+  }
+}
