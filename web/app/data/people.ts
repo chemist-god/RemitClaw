@@ -53,7 +53,6 @@ export const WALLET_ASSETS = [
 
 export const PEOPLE: Person[] = [
   { id: "tolly", name: "Tolly", avatar: toyAvatar("tolly"), country: "PH" },
-  { id: "sid", name: "Sid", avatar: toyAvatar("sid"), country: "NG" },
   { id: "anisha", name: "Anisha", avatar: toyAvatar("anisha"), country: "IN" },
   { id: "raima", name: "Raima", avatar: toyAvatar("raima"), country: "KE" },
   { id: "mom", name: "Mom", avatar: toyAvatar("mom"), country: "PH", favourite: true },
@@ -63,13 +62,13 @@ export const PEOPLE: Person[] = [
 
 export const FAVOURITES: Person[] = [
   { id: "mom", name: "Mom", avatar: toyAvatar("mom"), country: "PH", favourite: true },
-  { id: "dad", name: "Dad", avatar: toyAvatar("dad"), country: "NG", favourite: true },
+  { id: "tolly", name: "Tolly", avatar: toyAvatar("tolly"), country: "PH", favourite: true },
   { id: "sister", name: "Sister", avatar: toyAvatar("sister"), country: "PH", favourite: true },
 ];
 
 export const RECENT_TX = [
   { id: "1", to: "Mom", amount: 50, currency: "USDm", date: "Today", status: "confirmed" as const },
-  { id: "2", to: "Sid", amount: 120, currency: "EURm", date: "Yesterday", status: "confirmed" as const },
+  { id: "2", to: "Tolly", amount: 120, currency: "EURm", date: "Yesterday", status: "confirmed" as const },
   { id: "3", to: "Anisha", amount: 35, currency: "USDm", date: "Jun 4", status: "pending" as const },
 ];
 

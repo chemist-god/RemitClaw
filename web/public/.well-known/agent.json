@@ -1,33 +1,97 @@
 {
-  "type": "Agent",
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "Remifi",
-  "description": "AI remittance agent: send stablecoins across borders from a natural-language message, routed via Mento on Celo.",
-  "image": "https://remitclaw.app/assets/img1.png",
+  "description": "Remifi is an on-chain AI remittance agent for Celo. Tell it who to pay and how much in English, Spanish, Portuguese, or French and it handles the rest: intent parsing, live Mento stablecoin quotes, fee comparison vs Western Union and Wise, and signed swap-and-transfer execution. Available via web, HTTP API, OpenClaw (Telegram/WhatsApp), and x402.",
+  "image": "https://blob.8004scan.app/116efe70325791b5673bf2ecb1a3608a7af3991bc81cbdca6460d4a7f9042915.jpg",
   "endpoints": [
     {
       "type": "a2a",
-      "url": "https://remitclaw.app/.well-known/agent.json"
+      "url": "https://remifi.xyz/.well-known/agent.json"
     },
     {
       "type": "http",
-      "url": "https://api.remitclaw.app"
+      "url": "https://api.remifi.xyz"
     },
     {
       "type": "x402",
-      "url": "https://api.remitclaw.app/api/x402/premium-quote"
+      "url": "https://api.remifi.xyz/api/x402/premium-quote"
     }
   ],
   "services": [
-    { "name": "web", "endpoint": "https://remitclaw.app" },
-    { "name": "HTTP", "endpoint": "https://api.remitclaw.app", "version": "1.0.0" },
+    {
+      "name": "web",
+      "endpoint": "https://remifi.xyz"
+    },
+    {
+      "name": "HTTP",
+      "endpoint": "https://api.remifi.xyz",
+      "version": "1.0.0"
+    },
     {
       "name": "x402",
-      "endpoint": "https://api.remitclaw.app/api/x402/premium-quote",
+      "endpoint": "https://api.remifi.xyz/api/x402/premium-quote",
       "version": "1.0.0"
+    },
+    {
+      "name": "MCP",
+      "endpoint": "https://api.remifi.xyz",
+      "mcpTools": [
+        "natural_language_parsing",
+        "mento_quote",
+        "fee_comparison",
+        "stablecoin_transfer",
+        "mento_swap",
+        "contact_resolution",
+        "balance_lookup",
+        "transfer_history",
+        "claim_escrow",
+        "sms_notification",
+        "whatsapp_notification",
+        "multilingual_intent",
+        "spending_limits",
+        "x402_payments"
+      ],
+      "mcpPrompts": [
+        "send_money",
+        "get_quote",
+        "check_balance",
+        "view_contacts",
+        "transfer_history",
+        "confirm_send",
+        "cancel_transfer",
+        "add_recipient"
+      ],
+      "mcpResources": [
+        "parse_intent",
+        "get_quote",
+        "execute_transfer",
+        "list_contacts",
+        "resolve_contact",
+        "sync_contacts",
+        "import_phone_contacts",
+        "get_balance",
+        "get_history",
+        "get_claim",
+        "health_check",
+        "agent_info",
+        "premium_quote"
+      ]
+    },
+    {
+      "name": "OASF",
+      "endpoint": "https://github.com/agntcy/oasf/",
+      "skills": [
+        "advanced_reasoning_planning/strategic_planning",
+        "agent_orchestration/agent_coordination",
+        "agent_orchestration/multi_agent_planning",
+        "advanced_reasoning_planning/chain_of_thought_structuring"
+      ],
+      "domains": []
     }
   ],
   "x402Support": true,
   "active": true,
   "registrations": [],
-  "supportedTrust": ["reputation", "validation", "tee"]
+  "supportedTrust": ["reputation", "validation", "tee"],
+  "supportedTrusts": ["reputation", "crypto-economic", "tee-attestation"]
 }

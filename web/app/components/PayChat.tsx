@@ -19,18 +19,32 @@ import {
 } from "../lib/contacts";
 import {
   executeTransfer,
-  explorerTxUrl,
   fetchQuote,
   type QuoteResponse,
   type TransferContext,
 } from "../lib/api";
+import { checkRateAlerts } from "../lib/rate-alerts";
+import { listenForSpeech, speechLocale, speechRecognitionSupported } from "../lib/speech";
+import { FxRateBanner } from "./FxRateBanner";
+import { RateAlertSheet } from "./RateAlertSheet";
+import { TxReceiptShare } from "./TxReceiptShare";
 
 type Message =
   | {
       id: string;
       role: "bot";
       text: string;
+      quote?: QuoteResponse;
       txHash?: string;
+      receipt?: {
+        receiptId: string;
+        amount: number;
+        sourceCurrency: string;
+        destinationCurrency?: string;
+        recipientReceives?: number;
+        recipientName?: string;
+        savings?: string;
+      };
       confirm?: {
         label: string;
         message: string;
@@ -96,6 +110,7 @@ export function PayChat() {
   const searchParams = useSearchParams();
   const presetTo = searchParams.get("to");
   const presetAmount = searchParams.get("amount");
+  const presetWallet = searchParams.get("wallet");
   const { allPeople } = useContacts();
   const { refreshBalances } = useAgentApi();
   const { t, locale } = useLanguage();
@@ -104,18 +119,16 @@ export function PayChat() {
     () => [
       { label: t("pay.quick1") },
       { label: t("pay.quick2") },
-      { label: t("pay.quick3") },
     ],
     [t, locale]
   );
 
-  const [input, setInput] = useState(
-    presetTo && presetAmount
-      ? `Send $${presetAmount} to ${presetTo}`
-      : presetTo
-        ? `Send $50 to ${presetTo}`
-        : ""
-  );
+  const [input, setInput] = useState(() => {
+    if (presetWallet) return `Send $50 to ${presetWallet.slice(0, 6)}…${presetWallet.slice(-4)}`;
+    if (presetTo && presetAmount) return `Send $${presetAmount} to ${presetTo}`;
+    if (presetTo) return `Send $50 to ${presetTo}`;
+    return "";
+  });
   const [messages, setMessages] = useState<Message[]>([]);
   const presetSent = useRef(false);
   const [thinking, setThinking] = useState(false);
@@ -125,6 +138,10 @@ export function PayChat() {
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(
     null
   );
+  const [listening, setListening] = useState(false);
+  const [alertQuote, setAlertQuote] = useState<QuoteResponse | null>(null);
+  const [alertOpen, setAlertOpen] = useState(false);
+  const stopSpeechRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     setMessages([{ id: "intro", role: "bot", text: t("pay.intro") }]);
@@ -145,7 +162,11 @@ export function PayChat() {
     return matchContact(name, allPeople);
   };
 
-  const sendMessage = async (text: string, silent = false) => {
+  const sendMessage = async (
+    text: string,
+    silent = false,
+    extraCtx?: TransferContext
+  ) => {
     const trimmed = text.trim();
     if (!trimmed || thinking) return;
 
@@ -158,15 +179,32 @@ export function PayChat() {
 
     try {
       const activeContact = contactForMessage(trimmed);
-      const ctx = contactTransferContext(activeContact);
+      const ctx = {
+        ...contactTransferContext(activeContact),
+        ...extraCtx,
+      };
       const apiMessage = enrichMessageWithContact(trimmed, activeContact);
 
       const quote = await fetchQuote(apiMessage, ctx);
 
       if (quote.kind === "schedule") {
-        appendBot({ text: quote.summary });
+        appendBot({ text: quote.summary, quote });
         return;
       }
+
+      const hits = checkRateAlerts(
+        quote.intent.sourceCurrency,
+        quote.destinationCurrency ?? "",
+        quote.intent.destinationCountry,
+        quote.exchangeRate
+      );
+      const alertNote =
+        hits.length > 0
+          ? `\n\n${t("rateAlerts.hit", {
+              rate: hits[0].currentRate.toFixed(4),
+              currency: hits[0].alert.destinationCurrency,
+            })}`
+          : "";
 
       const recipientName =
         quote.intent.recipientName ?? activeContact?.name ?? "your recipient";
@@ -200,12 +238,21 @@ export function PayChat() {
   };
 
   useEffect(() => {
-    if (presetSent.current || !presetTo) return;
+    if (presetSent.current) return;
+    if (!presetTo && !presetWallet) return;
     presetSent.current = true;
+    if (presetWallet) {
+      void sendMessage(
+        `Send $50 to wallet ${presetWallet}`,
+        true,
+        { recipientWallet: presetWallet }
+      );
+      return;
+    }
     const amount = presetAmount ? Number(presetAmount) : 50;
     void sendMessage(`Send $${amount} to ${presetTo}`, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presetTo, presetAmount]);
+  }, [presetTo, presetAmount, presetWallet]);
 
   const openPaymentModal = (confirm: {
     message: string;
@@ -244,6 +291,15 @@ export function PayChat() {
           (result.txHash ? `\nReceipt: ${result.receiptId}` : "") +
           claimNote,
         txHash: result.txHash,
+        receipt: {
+          receiptId: result.receiptId,
+          amount: pendingPayment.quote.intent.amount,
+          sourceCurrency: pendingPayment.quote.intent.sourceCurrency,
+          destinationCurrency: result.destinationCurrency,
+          recipientReceives: result.recipientReceives,
+          recipientName: pendingPayment.recipientName,
+          savings: result.savings,
+        },
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : "Transfer failed";
@@ -260,6 +316,33 @@ export function PayChat() {
     setModalPhase("confirm");
     setPendingPayment(null);
   };
+
+  const toggleVoice = () => {
+    if (listening) {
+      stopSpeechRef.current?.();
+      stopSpeechRef.current = null;
+      setListening(false);
+      return;
+    }
+    if (!speechRecognitionSupported()) {
+      appendBot({ text: t("pay.voiceUnsupported") });
+      return;
+    }
+    setListening(true);
+    stopSpeechRef.current = listenForSpeech({
+      locale: speechLocale(locale),
+      onResult: (text) => {
+        setInput(text);
+        void sendMessage(text);
+      },
+      onError: (message) => appendBot({ text: message }),
+      onEnd: () => setListening(false),
+    });
+  };
+
+  useEffect(() => {
+    return () => stopSpeechRef.current?.();
+  }, []);
 
   return (
     <>
@@ -284,15 +367,23 @@ export function PayChat() {
                 <span className="text-xs font-bold text-brand-700">{ASSISTANT.name}</span>
               </div>
               <div className="bubble bubble-bot whitespace-pre-line">{msg.text}</div>
-              {msg.txHash && (
-                <a
-                  href={explorerTxUrl(msg.txHash)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 self-start text-xs font-semibold text-brand-700 underline underline-offset-2"
-                >
-                  View on explorer ↗
-                </a>
+              {msg.quote?.kind === "quote" && msg.quote.exchangeRate != null && (
+                <FxRateBanner
+                  quote={msg.quote}
+                  alertLabel={t("rateAlerts.set")}
+                  onSetAlert={() => {
+                    setAlertQuote(msg.quote ?? null);
+                    setAlertOpen(true);
+                  }}
+                />
+              )}
+              {msg.receipt && (
+                <TxReceiptShare
+                  receipt={{ ...msg.receipt, txHash: msg.txHash }}
+                  explorerLabel={t("pay.explorer")}
+                  shareLabel={t("pay.shareReceipt")}
+                  copiedLabel={t("pay.receiptCopied")}
+                />
               )}
               {msg.confirm && (
                 <button
@@ -327,12 +418,12 @@ export function PayChat() {
       </div>
 
       <div className="pay-composer">
-        <div className="mb-3 flex gap-2 overflow-x-auto">
+        <div className="mb-3 grid grid-cols-2 gap-2">
           {quickReplies.map((q) => (
             <button
               key={q.label}
               type="button"
-              className="chip"
+              className="chip chip-pay-quick min-w-0"
               disabled={thinking}
               onClick={() => void sendMessage(q.label)}
             >
@@ -354,7 +445,14 @@ export function PayChat() {
             placeholder={t("pay.placeholder")}
             className="min-w-0 flex-1 bg-transparent text-[0.9rem] text-ink outline-none placeholder:text-soft"
           />
-          <button type="button" className="icon-btn shrink-0" aria-label="Voice input">
+          <button
+            type="button"
+            className={`icon-btn shrink-0 ${listening ? "ring-2 ring-brand-500" : ""}`}
+            aria-label={t("pay.voice")}
+            aria-pressed={listening}
+            onClick={toggleVoice}
+            disabled={thinking}
+          >
             <MicIcon className="h-[1.15rem] w-[1.15rem]" />
           </button>
           <button type="submit" className="btn btn-dark shrink-0 px-5" disabled={thinking}>
@@ -362,6 +460,12 @@ export function PayChat() {
           </button>
         </form>
       </div>
+
+      <RateAlertSheet
+        open={alertOpen}
+        onClose={() => setAlertOpen(false)}
+        quote={alertQuote}
+      />
 
       <ConfirmationModal
         open={modalOpen}

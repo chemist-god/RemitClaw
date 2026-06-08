@@ -21,6 +21,10 @@ export function ConnectWallet({ label }: { label?: string }) {
       inAppWallet({
         auth: { options: ["email", "google", "apple", "passkey"] },
         metadata: { name: "RemitClaw" },
+        smartAccount: {
+          chain: celoChain,
+          sponsorGas: true,
+        },
       }),
       createWallet("io.metamask"),
       createWallet("com.valoraapp"),
@@ -53,7 +57,7 @@ export function ConnectWallet({ label }: { label?: string }) {
       appMetadata: {
         name: "RemitClaw",
         description: "Send stablecoins across borders, as easy as a message.",
-        url: "https://remitclaw.app",
+        url: "https://remifi.xyz",
       },
     });
   };

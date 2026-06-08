@@ -351,14 +351,17 @@ Sender sends to a phone-only contact; recipient opens SMS link, creates wallet, 
 
 **Goal:** Stand out and solve real problems.
 
-- [ ] **Contact wallet field + QR scan** — store `recipientWallet` on contacts (web add-contact form)
-- [ ] **Real-time FX rate display** in AI Pay (from Mento quote)
-- [ ] **Rate alerts** — notify when corridor rate improves
-- [ ] **Recurring transfer UI** — manage schedules in web
-- [ ] **Transaction receipts** with explorer links + shareable proof
-- [ ] **OpenClaw on WhatsApp** — enable channel in `openclaw.json` for chat-native sends
-- [ ] **Off-ramp stub** — show "cash out to GCash/M-Pesa" (partner placeholder)
-- [ ] **Voice input** — wire the existing mic button to speech-to-text
+- [x] **Contact wallet field + QR scan** — `AddContactForm` + `QrScanner` (camera + paste)
+- [x] **Real-time FX rate display** in AI Pay — `FxRateBanner` from live Mento `exchangeRate`
+- [x] **Rate alerts** — localStorage alerts + in-chat hit notification (`RateAlertsPanel`, `RateAlertSheet`)
+- [x] **Recurring transfer UI** — `RecurringSchedules` on wallet + `/api/schedules` CRUD
+- [x] **Transaction receipts** — `TxReceiptShare` (explorer link + Web Share / copy)
+- [x] **OpenClaw on WhatsApp** — enabled in `openclaw.json` (needs gateway + Twilio live)
+- [x] **Off-ramp stub** — `OffRampPartners` on withdraw (GCash, M-Pesa, Pix — coming soon)
+- [x] **Voice input** — mic in `PayChat` via Web Speech API (`speech.ts`)
+- [x] **Deposit / Withdraw** — real deposit QR (`DepositContent`); withdraw + off-ramp stub (`WithdrawContent`)
+- [x] **Gas sponsorship** — `inAppWallet` `smartAccount.sponsorGas` in `ConnectWallet`
+- [ ] **Browser-signed transfers (Model B)** — still deferred; sends use agent wallet
 
 ---
 

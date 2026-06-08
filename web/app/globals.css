@@ -247,6 +247,15 @@
   .chip:active {
     background: var(--color-brand-100);
   }
+  .chip-pay-quick {
+    justify-content: center;
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    white-space: normal;
+    text-align: center;
+  }
   .chip-active {
     background: var(--color-brand-500);
     color: #fff;
@@ -1066,7 +1075,12 @@
     background: var(--color-brand-500);
   }
 
-  .scan-sheet-body {
+  .fx-rate-banner {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.scan-sheet-body {
     padding: 0 1.25rem 1.5rem;
   }
 

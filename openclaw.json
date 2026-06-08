@@ -29,6 +29,8 @@
           "CELO_RPC_URL": "${CELO_RPC_URL}",
           "CELO_CHAIN_ID": "${CELO_CHAIN_ID}",
           "AGENT_PRIVATE_KEY": "${AGENT_PRIVATE_KEY}",
+          "DATA_DIR": "${DATA_DIR}",
+          "AGENT_API_PORT": "8787",
           "AGENT_ID": "${AGENT_ID}",
           "DEMO_RECIPIENT_ADDRESS": "${DEMO_RECIPIENT_ADDRESS}",
           "REMIFI_VAULT_ADDRESS": "${REMIFI_VAULT_ADDRESS}",
@@ -37,8 +39,6 @@
           "TWILIO_AUTH_TOKEN": "${TWILIO_AUTH_TOKEN}",
           "TWILIO_WHATSAPP_FROM": "${TWILIO_WHATSAPP_FROM}",
           "TWILIO_SMS_FROM": "${TWILIO_SMS_FROM}",
-          "DATA_DIR": "${DATA_DIR}",
-          "AGENT_API_PORT": "${AGENT_API_PORT}",
           "AGENT_API_KEY": "${AGENT_API_KEY}"
         }
       }

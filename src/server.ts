@@ -8,11 +8,14 @@ import {
   getClaimInfo,
   getContactByName,
   getHistory,
+  getSchedules,
   importContactsFromPhone,
   listContacts,
   quoteForMessage,
   removeContact,
+  removeSchedule,
   saveContact,
+  toggleSchedule,
 } from "./api/service.js";
 import { StoredContactSchema } from "./contacts/types.js";
 import { buildAgentCard } from "./agent/agent-card.js";
@@ -261,6 +264,28 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && path === "/api/history") {
       return sendJson(res, 200, { items: getHistory(config) });
+    }
+
+    if (req.method === "GET" && path === "/api/schedules") {
+      return sendJson(res, 200, { schedules: getSchedules(config) });
+    }
+
+    if (req.method === "DELETE" && path.startsWith("/api/schedules/")) {
+      const id = decodeURIComponent(path.slice("/api/schedules/".length));
+      if (!id) return sendJson(res, 400, { error: "schedule id required" });
+      const removed = removeSchedule(config, id);
+      if (!removed) return sendJson(res, 404, { error: "Schedule not found" });
+      return sendJson(res, 200, { ok: true });
+    }
+
+    if (req.method === "PATCH" && path.startsWith("/api/schedules/")) {
+      const id = decodeURIComponent(path.slice("/api/schedules/".length));
+      if (!id) return sendJson(res, 400, { error: "schedule id required" });
+      const body = await readBody(req);
+      const active = Boolean(body.active);
+      const updated = toggleSchedule(config, id, active);
+      if (!updated) return sendJson(res, 404, { error: "Schedule not found" });
+      return sendJson(res, 200, { schedule: updated });
     }
 
     if (req.method === "GET" && path === "/api/balance") {

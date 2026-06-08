@@ -31,7 +31,7 @@ export const NOTIFICATIONS: AppNotification[] = [
   {
     id: "4",
     title: "Transfer received",
-    body: "Sid sent you €120 EURm.",
+    body: "Tolly sent you €120 EURm.",
     time: "Jun 4",
     unread: false,
   },

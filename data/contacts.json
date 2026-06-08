@@ -8,16 +8,16 @@
     "updatedAt": "1970-01-01T00:00:00.000Z"
   },
   {
-    "id": "dad",
-    "name": "Dad",
-    "country": "NG",
+    "id": "sister",
+    "name": "Sister",
+    "country": "PH",
     "favourite": true,
     "source": "seed",
     "updatedAt": "1970-01-01T00:00:00.000Z"
   },
   {
-    "id": "sister",
-    "name": "Sister",
+    "id": "tolly",
+    "name": "Tolly",
     "country": "PH",
     "favourite": true,
     "source": "seed",
