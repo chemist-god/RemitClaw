@@ -2,10 +2,10 @@
 
 import { useMemo } from "react";
 import { useConnectModal } from "thirdweb/react";
-import { createWallet, inAppWallet } from "thirdweb/wallets";
 import { useWallet } from "../context/WalletContext";
 import { remitClawTheme } from "../lib/thirdweb-theme";
 import { celoChain, getThirdwebClient, thirdwebConfigured } from "../lib/thirdweb";
+import { getRemifiWallets } from "../lib/thirdweb-wallets";
 
 /**
  * Opens thirdweb's connect modal via a native app button.
@@ -16,22 +16,7 @@ export function ConnectWallet({ label }: { label?: string }) {
   const { connect, isConnecting } = useConnectModal();
   const client = getThirdwebClient();
 
-  const wallets = useMemo(
-    () => [
-      inAppWallet({
-        auth: { options: ["email", "google", "apple", "passkey"] },
-        metadata: { name: "RemitClaw" },
-        smartAccount: {
-          chain: celoChain,
-          sponsorGas: true,
-        },
-      }),
-      createWallet("io.metamask"),
-      createWallet("com.valoraapp"),
-      createWallet("walletConnect"),
-    ],
-    []
-  );
+  const wallets = useMemo(() => getRemifiWallets(), []);
 
   if (isConnected) return null;
 

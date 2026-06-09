@@ -20,11 +20,13 @@ const STORAGE_KEY = "remitclaw-wallet-prefs";
 type StoredPrefs = {
   balanceVisible: boolean;
   currencyCode: string;
+  defaultCorridorId: string;
 };
 
 const DEFAULT_PREFS: StoredPrefs = {
   balanceVisible: true,
   currencyCode: "USD",
+  defaultCorridorId: "usd-php",
 };
 
 type WalletPreferencesContextValue = {
@@ -32,6 +34,8 @@ type WalletPreferencesContextValue = {
   toggleBalanceVisible: () => void;
   currencyCode: string;
   setCurrencyCode: (code: string) => void;
+  defaultCorridorId: string;
+  setDefaultCorridorId: (id: string | ((current: string) => string)) => void;
   currency: ReturnType<typeof getCurrencyByCode>;
   balanceAmount: number;
 };
@@ -58,6 +62,10 @@ function readStoredPrefs(): StoredPrefs {
           ? parsed.balanceVisible
           : DEFAULT_PREFS.balanceVisible,
       currencyCode,
+      defaultCorridorId:
+        typeof parsed.defaultCorridorId === "string"
+          ? parsed.defaultCorridorId
+          : DEFAULT_PREFS.defaultCorridorId,
     };
   } catch {
     return DEFAULT_PREFS;
@@ -90,6 +98,16 @@ export function WalletPreferencesProvider({ children }: { children: ReactNode })
     setPrefs((current) => ({ ...current, currencyCode }));
   }, []);
 
+  const setDefaultCorridorId = useCallback((idOrUpdater: string | ((current: string) => string)) => {
+    setPrefs((current) => ({
+      ...current,
+      defaultCorridorId:
+        typeof idOrUpdater === "function"
+          ? idOrUpdater(current.defaultCorridorId)
+          : idOrUpdater,
+    }));
+  }, []);
+
   const currency = getCurrencyByCode(prefs.currencyCode);
   const balanceAmount = getBalanceForCurrency(prefs.currencyCode);
 
@@ -99,14 +117,18 @@ export function WalletPreferencesProvider({ children }: { children: ReactNode })
       toggleBalanceVisible,
       currencyCode: prefs.currencyCode,
       setCurrencyCode,
+      defaultCorridorId: prefs.defaultCorridorId,
+      setDefaultCorridorId,
       currency,
       balanceAmount,
     }),
     [
       prefs.balanceVisible,
       prefs.currencyCode,
+      prefs.defaultCorridorId,
       toggleBalanceVisible,
       setCurrencyCode,
+      setDefaultCorridorId,
       currency,
       balanceAmount,
     ]

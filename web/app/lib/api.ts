@@ -95,6 +95,25 @@ export type AgentResponse = {
   registered?: boolean;
 };
 
+export type ProfileCorridor = {
+  id: string;
+  sourceCurrency: string;
+  destinationCurrency: string;
+  destinationCountry: string;
+  label: string;
+};
+
+export type ProfileResponse = {
+  limits: {
+    dailyLimitUsd: number;
+    singleTransferLimitUsd: number;
+    dailySpentUsd: number;
+    confirmationThresholdUsd: number;
+  };
+  corridors: ProfileCorridor[];
+  defaultCorridorId: string;
+};
+
 export type HealthResponse = {
   ok: boolean;
   chainId: number;
@@ -191,6 +210,12 @@ export async function executeTransfer(
 export async function fetchAgentInfo(): Promise<AgentResponse> {
   const res = await fetch(`${API_BASE}/api/agent`, { headers: headers() });
   return handle<AgentResponse>(res);
+}
+
+/** Spending limits and supported corridors from the agent config. */
+export async function fetchProfile(): Promise<ProfileResponse> {
+  const res = await fetch(`${API_BASE}/api/profile`, { headers: headers() });
+  return handle<ProfileResponse>(res);
 }
 
 export async function fetchBalances(address: string): Promise<BalanceResponse> {

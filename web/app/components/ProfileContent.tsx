@@ -6,6 +6,7 @@ import { PROFILE } from "../data/people";
 import { useLanguage } from "../context/LanguageContext";
 import { Avatar } from "./Avatar";
 import { LanguageSelector } from "./LanguageSelector";
+import { ProfileSettings } from "./ProfileSettings";
 import { ChevronLeftIcon } from "./icons";
 
 const ProfileWalletCard = dynamic(
@@ -38,7 +39,7 @@ export function ProfileContent() {
         <h1 className="flex-1 text-center text-[1.05rem] font-bold">
           {t("profile.title")}
         </h1>
-        <span className="w-10" />
+        <LanguageSelector variant="compact" />
       </header>
 
       <div className="screen px-5 pb-8">
@@ -48,26 +49,10 @@ export function ProfileContent() {
           <p className="mt-1 text-sm text-muted">{t("profile.walletSubtitle")}</p>
         </div>
 
-        <LanguageSelector variant="row" />
-
         <ProfileWalletCard />
         <WalletAssets />
 
-        <div className="mt-8 flex flex-col gap-2">
-          {[
-            { label: t("profile.accountDetails"), value: t("profile.verified") },
-            { label: t("profile.dailyLimit"), value: "$500 USD" },
-            { label: t("profile.singleLimit"), value: "$200 USD" },
-            { label: t("profile.defaultCorridor"), value: "USDm → PHP" },
-          ].map((row) => (
-            <div key={row.label} className="asset-row">
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-ink">{row.label}</p>
-              </div>
-              <p className="text-sm font-semibold text-brand-600">{row.value}</p>
-            </div>
-          ))}
-        </div>
+        <ProfileSettings />
 
         <Link href="/people" className="btn btn-gradient btn-block mt-8">
           {t("profile.manageContacts")}
