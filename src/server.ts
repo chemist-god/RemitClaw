@@ -8,6 +8,7 @@ import {
   getClaimInfo,
   getContactByName,
   getHistory,
+  getProfileInfo,
   getSchedules,
   importContactsFromPhone,
   listContacts,
@@ -198,6 +199,10 @@ const server = createServer(async (req, res) => {
         agentRegistry: agentRegistryId(config),
         registered: config.agentId != null,
       });
+    }
+
+    if (req.method === "GET" && path === "/api/profile") {
+      return sendJson(res, 200, getProfileInfo(config));
     }
 
     if (req.method === "GET" && path === "/api/contacts") {

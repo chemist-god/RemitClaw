@@ -2,7 +2,7 @@ import { formatUnits, type Address } from "viem";
 import type { Config } from "../config/index.js";
 import type { RemittanceIntent } from "../types/index.js";
 import { parseRemittanceIntent } from "../intent/parser.js";
-import { prepareTransfer } from "../transfers/executor.js";
+import { prepareTransfer, getSpendingLimits } from "../transfers/executor.js";
 import { compareFees, formatSavings } from "../fees/comparison.js";
 import {
   cancelSchedule,
@@ -13,7 +13,7 @@ import {
 } from "../transfers/scheduler.js";
 import { RemitClawAgent } from "../agent/remitclaw-agent.js";
 import { loadTransactions, saveTransaction } from "../history/store.js";
-import { CELO_MAINNET_TOKENS } from "../mento/client.js";
+import { CELO_MAINNET_TOKENS, loadCorridors } from "../mento/client.js";
 import { getAgentAccount, getTokenBalance } from "../wallet/client.js";
 import { resolveContactContext } from "../contacts/resolve.js";
 import {
@@ -355,6 +355,36 @@ export function getAgentAddress(config: Config): string | null {
   } catch {
     return null;
   }
+}
+
+export type ProfileCorridor = {
+  id: string;
+  sourceCurrency: string;
+  destinationCurrency: string;
+  destinationCountry: string;
+  label: string;
+};
+
+export function getProfileInfo(config: Config) {
+  const limits = getSpendingLimits(config);
+  const corridors: ProfileCorridor[] = loadCorridors(config.dataDir).map((c) => ({
+    id: c.id,
+    sourceCurrency: c.sourceCurrency,
+    destinationCurrency: c.destinationCurrency,
+    destinationCountry: c.destinationCountry,
+    label: `${c.sourceCurrency}m → ${c.destinationCurrency}`,
+  }));
+
+  return {
+    limits: {
+      dailyLimitUsd: limits.dailyLimitUsd,
+      singleTransferLimitUsd: limits.singleTransferLimitUsd,
+      dailySpentUsd: limits.dailySpentUsd,
+      confirmationThresholdUsd: limits.confirmationThresholdUsd,
+    },
+    corridors,
+    defaultCorridorId: corridors[0]?.id ?? "usd-php",
+  };
 }
 
 export interface HistoryItem {

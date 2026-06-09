@@ -2,12 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { FAVOURITES } from "../data/people";
 import { Avatar } from "./Avatar";
 import { BoltIcon } from "./icons";
 import { useLanguage } from "../context/LanguageContext";
+
+const InlineWalletSetup = dynamic(
+  () => import("./InlineWalletSetup").then((m) => m.InlineWalletSetup),
+  { ssr: false }
+);
 
 function StepHero({ step }: { step: "welcome" | "ai-pay" | "people" }) {
   const { t } = useLanguage();
@@ -77,7 +82,6 @@ function StepHero({ step }: { step: "welcome" | "ai-pay" | "people" }) {
 }
 
 export function OnboardingFlow() {
-  const router = useRouter();
   const { t } = useLanguage();
   const [step, setStep] = useState(0);
 
@@ -153,18 +157,7 @@ export function OnboardingFlow() {
         </div>
 
         {isLast ? (
-          <div className="mt-7 flex flex-col gap-3">
-            <button
-              type="button"
-              className="btn btn-gradient btn-block"
-              onClick={() => router.push("/auth")}
-            >
-              {t("onboarding.createWallet")}
-            </button>
-            <Link href="/home" className="btn btn-light btn-block">
-              {t("onboarding.maybeLater")}
-            </Link>
-          </div>
+          <InlineWalletSetup />
         ) : (
           <button
             type="button"
